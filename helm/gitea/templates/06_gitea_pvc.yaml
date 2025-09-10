@@ -9,5 +9,5 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi # Adjust size as needed for Gitea application data
+      storage: 512Mi # Adjust size as needed for Gitea application data
   storageClassName: hostpath-provisioner
