@@ -95,12 +95,12 @@ resource "null_resource" "argocd_install" {
   depends_on = [kubernetes_namespace_v1.argocd_namespace]
 
   provisioner "local-exec" {
-    command = "kubectl apply -f ${path.module}/../../helm/argocd/install.yaml"
+    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl apply -f helm/argocd/install.yaml'"
   }
 
   provisioner "local-exec" {
     when = destroy
-    command = "kubectl delete -f ${path.module}/../../helm/argocd/install.yaml --ignore-not-found=true"
+    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl delete -f helm/argocd/install.yaml --ignore-not-found=true'"
   }
 }
 
@@ -109,12 +109,12 @@ resource "null_resource" "argocd_infra_app" {
   depends_on = [null_resource.argocd_install]
 
   provisioner "local-exec" {
-    command = "kubectl apply -f ${path.module}/../../helm/argocd/infra-app.yaml"
+    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl apply -f helm/argocd/infra-app.yaml'"
   }
 
   provisioner "local-exec" {
     when = destroy
-    command = "kubectl delete -f ${path.module}/../../helm/argocd/infra-app.yaml --ignore-not-found=true"
+    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl delete -f helm/argocd/infra-app.yaml --ignore-not-found=true'"
   }
 }
 
