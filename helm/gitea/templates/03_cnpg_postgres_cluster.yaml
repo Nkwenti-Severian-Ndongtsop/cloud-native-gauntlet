@@ -19,6 +19,16 @@ spec:
       owner: {{ .Values.gitea.database.user }}
       secret:
         name: {{ .Values.gitea.database.existingSecret }}
+  # Ensure data persistence and recovery
+  postgresql:
+    parameters:
+      wal_level: replica
+      max_wal_senders: 3
+      max_replication_slots: 3
+      hot_standby: "on"
+      archive_mode: "on"
+      archive_command: "test ! -f /controller/archive/%f && cp %p /controller/archive/%f"
+  
   # Node affinity to ensure data persistence on the same node
   affinity:
     nodeAffinity:
