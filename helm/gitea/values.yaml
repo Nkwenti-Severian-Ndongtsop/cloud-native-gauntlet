@@ -20,5 +20,5 @@ postgresql:
   enabled: true
   name: gitea-db
   storage:
-    size: 8Gi
+    size: 512Mi
     storageClassName: hostpath-provisioner
