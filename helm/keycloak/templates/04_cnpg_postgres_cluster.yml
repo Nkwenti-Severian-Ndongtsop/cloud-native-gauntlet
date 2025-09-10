@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.deployments.postgres.service.name }}
+  namespace: {{ .Values.namespace }}
+spec:
+  instances: 1
+  imageName: "{{ .Values.deployments.postgres.image.name }}"
+  storage:
+    size: {{ .Values.pv.size }}
+    storageClass: standard
+  superuserSecret:
+    name: {{ .Values.secrets.postgres.name }}
+  databases:
+    - name: {{ .Values.deployments.postgres.db.name }}
+      owner: {{ .Values.secrets.postgres.admin.name }}
+  bootstrap:
+    initdb:
+      dataChecksums: true
+  
+  # Configure health and readiness probes
+  monitoring:
+    enablePodMonitor: true
+    podMonitor:
+      labels:
+        release: prometheus-stack

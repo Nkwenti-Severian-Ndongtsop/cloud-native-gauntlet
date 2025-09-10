@@ -1,0 +1,36 @@
+---
+- name: Create registry directory
+  file:
+    path: /var/lib/registry
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Run local registry container
+  docker_container:
+    name: registry
+    image: registry:3.0.0
+    state: started
+    restart_policy: always
+    ports:
+      - "5000:5000"
+    volumes:
+      - /var/lib/registry:/var/lib/registry
+    env:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+
+- name: Configure Docker to trust insecure registry
+  copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "exec-opts": ["native.cgroupdriver=systemd"],
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "100m"
+        },
+        "storage-driver": "overlay2",
+        "insecure-registries": ["{{ ansible_host }}:5000", "localhost:5000"]
+      }
+  notify: restart docker

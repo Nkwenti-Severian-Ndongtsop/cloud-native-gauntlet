@@ -1,0 +1,17 @@
+services:
+  db:
+    image: postgres:14-alpine
+    container_name: todo_app_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: todo_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - todo_data:/var/lib/postgresql/data
+  
+
+volumes:
+  todo_data:

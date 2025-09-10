@@ -1,0 +1,140 @@
+---
+# Debug network connectivity
+- name: Check internet connectivity
+  shell: ping -c 3 google.com
+  register: ping_test
+  ignore_errors: yes
+  changed_when: false
+
+- name: Show DNS resolution
+  shell: cat /etc/resolv.conf
+  register: dns_config
+  changed_when: false
+
+- name: Update package lists with debug output
+  shell: |
+    apt-get update -o Debug::Acquire::http=1 -o Debug::pkgAcquire::Worker=1
+  register: apt_update_debug
+  ignore_errors: yes
+  changed_when: false
+
+- name: Display apt update debug output
+  debug:
+    var: apt_update_debug.stderr_lines
+  when: apt_update_debug.stderr is defined
+
+# Configure apt to use IPv4 only to prevent IPv6 issues
+- name: Configure apt to prefer IPv4
+  lineinfile:
+    path: /etc/apt/apt.conf.d/99force-ipv4
+    line: 'Acquire::ForceIPv4 "true";'
+    create: yes
+    mode: '0644'
+
+# Update package lists with retries
+- name: Update apt package index
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+    force_apt_get: yes
+  register: apt_update
+  retries: 3
+  delay: 10
+  until: apt_update is succeeded
+  ignore_errors: yes
+
+- name: Install required apt packages
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - software-properties-common
+    state: present
+    force_apt_get: yes
+  become: yes
+
+- name: Install common packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - curl
+    - wget
+    - git
+    - vim
+    - htop
+    - jq
+    - gnupg
+    - software-properties-common
+    - apt-transport-https
+    - ca-certificates
+    - python3-pip
+    - python3-apt
+
+- name: Set timezone to UTC
+  timezone:
+    name: UTC
+
+- name: Disable swap
+  command: swapoff -a
+  when: ansible_swaptotal_mb > 0
+  ignore_errors: yes
+
+- name: Remove swap from fstab
+  replace:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    replace: '# \1'
+  when: ansible_swaptotal_mb > 0
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+- name: Enable kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - overlay
+    - br_netfilter
+
+# Install Helm (official tarball)
+- name: Set Helm version
+  set_fact:
+    helm_version: "{{ helm_version | default('v3.15.3') }}"
+
+- name: Download Helm tarball
+  get_url:
+    url: "https://get.helm.sh/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    mode: '0644'
+  register: helm_tar
+  retries: 3
+  delay: 5
+  until: helm_tar is succeeded
+  become: yes
+
+- name: Extract Helm tarball
+  unarchive:
+    src: "/tmp/helm-{{ helm_version }}-linux-amd64.tar.gz"
+    dest: /tmp
+    remote_src: yes
+  become: yes
+
+- name: Install Helm binary
+  copy:
+    src: /tmp/linux-amd64/helm
+    dest: /usr/local/bin/helm
+    mode: '0755'
+    owner: root
+    group: root
+    remote_src: yes
+  become: yes
+
+# Terraform intentionally not installed in VMs; it will run on the host.

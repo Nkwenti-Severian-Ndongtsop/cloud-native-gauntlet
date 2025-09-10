@@ -1,0 +1,54 @@
+---
+- name: Install K3s server
+  become: yes
+  shell: |
+    curl -sfL https://get.k3s.io | \
+    INSTALL_K3S_EXEC="--cluster-init \
+      --tls-san {{ k3s_master_ip }} \
+      --node-ip {{ ansible_host }} \
+      --bind-address {{ ansible_host }} \
+      --advertise-address {{ ansible_host }} \
+      --write-kubeconfig-mode 644 \
+      --flannel-backend=vxlan \
+      --kubelet-arg=cloud-provider=external" \
+    sh -
+  args:
+    creates: /etc/rancher/k3s/k3s.yaml
+  register: k3s_install
+  changed_when: k3s_install.rc == 0
+
+- name: Debug K3s installation output
+  copy:
+    content: "{{ k3s_install.stdout | default('') }}\n{{ k3s_install.stderr | default('') }}\nReturn Code: {{ k3s_install.rc }}"
+    dest: /var/log/k3s_install_debug.log
+    owner: root
+    group: root
+    mode: '0644'
+  delegate_to: k3s-master
+  when: k3s_install is defined
+
+- name: Get node token
+  shell: cat /var/lib/rancher/k3s/server/node-token
+  register: k3s_token
+  changed_when: false
+  when: k3s_install.rc == 0
+
+- name: Set k3s token fact
+  set_fact:
+    k3s_token: "{{ k3s_token.stdout }}"
+  when: k3s_token.stdout is defined
+
+- name: Create .kube directory
+  file:
+    path: /root/.kube
+    state: directory
+    mode: '0700'
+
+- name: Copy kubeconfig to home directory
+  copy:
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /root/.kube/config
+    remote_src: yes
+    owner: root
+    group: root
+    mode: '0600'

@@ -1,0 +1,35 @@
+name: automated todo-app build and push to ghcr.io
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  IMAGE_NAME: todo-api
+  IMAGE_PATH: nkwenti-severian-ndongtsop
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./todo_app
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_PATH }}/${{ env.IMAGE_NAME }}:latest

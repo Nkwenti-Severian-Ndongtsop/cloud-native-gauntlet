@@ -1,0 +1,47 @@
+kind: pipeline
+type: docker
+name: build-and-release
+
+steps:
+  - name: docker_build_and_push
+    image: plugins/docker
+    settings:
+      repo: gitea.local/nkwenti/todo-api
+      tags:
+        - ${DRONE_BUILD_NUMBER}
+        - ${DRONE_COMMIT_SHA}
+        - latest
+      registry: gitea.local
+      username:
+        from_secret: gitea_user
+      password:
+        from_secret: gitea_pass
+      context: ./todo_app
+      dockerfile: ./todo_app/Dockerfile
+
+  - name: bump_infra_repo
+    image: alpine/git
+    environment:
+      GITEA_USER:
+        from_secret: gitea_user
+      GITEA_PASS:
+        from_secret: gitea_pass
+      IMAGE: gitea.local/nkwenti/todo-api:${DRONE_BUILD_NUMBER}
+    commands:
+      - git config --global user.name "Drone CI"
+      - git config --global user.email "ci@gitea.local"
+      - git clone http://$GITEA_USER:$GITEA_PASS@gitea.local/nkwenti/infra.git
+      - cd infra
+      - sed -i -E "s|^[[:space:]]*image:.*$|        image: ${IMAGE}|g" kubernetes/todo-app-deployment.yaml
+      - git add kubernetes/todo-app-deployment.yaml
+      - git commit -m "deploy ${IMAGE} [ci skip]" || echo "no changes"
+      - git push origin master
+
+trigger:
+  event:
+    - push
+  branch:
+    - master
+    - main
+
+

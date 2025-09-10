@@ -1,0 +1,17 @@
+# build
+/target
+
+# frontend
+node_modules
+assets/main.css
+
+# IDE
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# direnv
+.envrc
+.direnv/

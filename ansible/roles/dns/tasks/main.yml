@@ -1,0 +1,27 @@
+---
+- name: Add host entries for all nodes
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item].ansible_host }} {{ item }} {{ item.split('.')[0] }}"
+    state: present
+  with_items: "{{ groups['all'] }}"
+  when: hostvars[item].ansible_host is defined
+
+- name: Add Kubernetes API server entry
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ k3s_master_ip }} kubernetes kubernetes.default.svc.cluster.local"
+    state: present
+  when: node_role == 'master'
+
+- name: Add local domain entries for applications
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ k3s_master_ip }} {{ item }}"
+    state: present
+  with_items:
+    - "k3s.local"
+    - "gitea.local"
+    - "keycloak.local"
+    - "argocd.local"
+    - "todo.local"

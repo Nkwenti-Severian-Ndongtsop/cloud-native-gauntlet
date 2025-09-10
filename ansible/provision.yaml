@@ -1,0 +1,34 @@
+---
+- name: Setup K3s Cluster Nodes
+  hosts: all
+  become: yes
+  tasks:
+    - name: Ensure curl is installed
+      ansible.builtin.apt:
+        name: curl
+        state: present
+        update_cache: yes
+
+- name: Install K3s on Master Node
+  hosts: k3s_masters
+  become: yes
+  tasks:
+    - name: Install K3s control plane
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | sh -s - server --cluster-init
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Fetch K3s node token from master
+      ansible.builtin.command: cat /var/lib/rancher/k3s/server/node-token
+      register: k3s_token
+
+- name: Join Worker Nodes to Cluster
+  hosts: k3s_workers
+  become: yes
+  tasks:
+    - name: Join K3s worker to the cluster
+      ansible.builtin.shell: |
+        curl -sfL https://get.k3s.io | K3S_URL=https://192.168.56.10:6443 K3S_TOKEN={{ hostvars['k3s-master']['k3s_token']['stdout'] }} sh -s -
+      args:
+        creates: /usr/local/bin/k3s

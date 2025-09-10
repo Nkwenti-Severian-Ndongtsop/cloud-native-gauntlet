@@ -1,0 +1,25 @@
+apiVersion: apps.kubernetes.io/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.operator.fullnameOverride }}
+  namespace: default # Deploy to default namespace
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.operator.fullnameOverride }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Values.operator.fullnameOverride }}
+    spec:
+      serviceAccountName: {{ .Values.operator.fullnameOverride }}
+      containers:
+        - name: operator
+          image: "{{ .Values.operator.image.name }}:{{ .Values.operator.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: CNPG_POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace

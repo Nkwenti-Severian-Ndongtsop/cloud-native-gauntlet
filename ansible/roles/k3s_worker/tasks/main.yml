@@ -1,0 +1,25 @@
+---
+- name: Wait for master node to be ready
+  wait_for_connection:
+    delay: 10
+    timeout: 300
+
+- name: Install K3s agent
+  shell: |
+    curl -sfL https://get.k3s.io | \
+    K3S_URL=https://{{ k3s_master_ip }}:6443 \
+    K3S_TOKEN={{ hostvars[groups['k3s_masters'][0]]['k3s_token'] }} \
+    K3S_NODE_IP={{ ansible_host }} \
+    sh -
+  args:
+    creates: /etc/rancher/k3s/k3s-agent.env
+  register: k3s_install
+  changed_when: k3s_install.rc == 0
+  when: hostvars[groups['k3s_masters'][0]]['k3s_token'] is defined
+
+- name: Ensure K3s agent is running
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: yes
+  when: k3s_install.rc == 0

@@ -1,0 +1,45 @@
+namespace: keycloak
+
+secrets:
+  postgres:
+    name: postgres-credentials
+    admin:
+      name: nkwenti
+      password: password
+  tls:
+    name: tls-secret
+    cert: ""
+    key: ""
+  keycloak:
+    name: keycloak-secrets
+    admin:
+      name: nkwenti
+      password: password
+
+deployments:
+  securePort: 80
+  postgres:
+    image:
+      name: postgres:14-alpine
+    db:
+      name: keycloak
+    service:
+      name: postgres
+      port: 5432
+    volume:
+      name: postgres-storage
+      path: /var/lib/postgresql/data
+  keycloak:
+    service:
+      name: keycloak
+    ports:
+      containerPort: 8080
+  ingress:
+    host: keycloak.local
+
+pv:
+  name: postgres-pv
+  size: 1Gi
+pvc:
+  name: postgres-pvc
+  size: 1Gi

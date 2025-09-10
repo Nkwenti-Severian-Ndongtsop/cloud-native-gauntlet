@@ -1,0 +1,11 @@
+.vagrant
+README.md
+target
+.env
+.terraform*
+*.tfstate*
+*.tfvars
+*.tfplan
+*.md
+offline-images/
+.gitea/
