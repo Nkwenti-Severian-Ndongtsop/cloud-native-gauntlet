@@ -6,7 +6,7 @@ metadata:
     {{- include "gitea.labels" . | nindent 4 }}
 spec:
   instances: 1
-  primaryUpdateStrategy: Supervised
+  primaryUpdateStrategy: supervised
   storage:
     size: {{ .Values.postgresql.storage.size }}
     storageClassName: hostpath-provisioner
