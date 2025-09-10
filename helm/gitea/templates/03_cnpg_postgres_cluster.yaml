@@ -1,0 +1,31 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgresql.name }}
+  labels:
+    {{- include "gitea.labels" . | nindent 4 }}
+spec:
+  instances: 1
+  primaryUpdateStrategy: Supervised
+  storage:
+    size: {{ .Values.postgresql.storage.size }}
+    storageClassName: hostpath-provisioner
+  superuserSecret:
+    name: {{ .Values.gitea.database.existingSecret }}
+  enableSuperuserAccess: true
+  bootstrap:
+    initdb:
+      database: {{ .Values.gitea.database.name }}
+      owner: {{ .Values.gitea.database.user }}
+      secret:
+        name: {{ .Values.gitea.database.existingSecret }}
+  # Node affinity to ensure data persistence on the same node
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                  - {{ .Values.global.k8s_node_name | default "k3s-control-plane-01" }}

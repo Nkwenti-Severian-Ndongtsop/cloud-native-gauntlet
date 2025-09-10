@@ -7,19 +7,12 @@ VAGRANTFILE_API_VERSION = "2"
 
 # VM Configuration
 NODES = {
-  'k3s-master' => {
+  'cloud-gauntlet' => {
     :ip => '192.168.56.10',
-    :cpus => 2,
-    :memory => 4096,
-    :role => 'master',
-    :hostname => 'k3s-master'
-  },
-  'k3s-worker' => {
-    :ip => '192.168.56.11',
-    :cpus => 2,
-    :memory => 2048,
-    :role => 'worker',
-    :hostname => 'k3s-worker'
+    :cpus => 4,
+    :memory => 6144,
+    :roles => ['master', 'worker'],
+    :hostname => 'cloud-gauntlet'
   }
 }
 
@@ -74,15 +67,15 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
         ansible.inventory_path = "ansible/hosts.ini"
         ansible.limit = "all"
         ansible.extra_vars = {
-          node_role: node_config[:role],
-          k3s_master_ip: NODES['k3s-master'][:ip]
+          node_roles: node_config[:roles],
+          k3s_master_ip: node_config[:ip]
         }
       end
     end
   end
   
   # Hosts file update (optional if vagrant-hostmanager is installed)
-  if Vagrant.has_plugin?("vagrant-hostmanager")
+  if false && Vagrant.has_plugin?("vagrant-hostmanager")
     config.hostmanager.enabled = true
     config.hostmanager.manage_host = true
     config.hostmanager.ignore_private_ip = false

@@ -1,0 +1,24 @@
+global:
+  k8s_node_name: k3s-control-plane-01
+gitea:
+  image:
+    repository: gitea/gitea
+    tag: 1.20.5
+  ingress:
+    enabled: true
+    host: gitea.local
+    className: nginx
+  database:
+    type: postgres
+    host: gitea-db
+    port: 5432
+    user: gitea
+    name: gitea
+    existingSecret: gitea-db-secret
+
+postgresql:
+  enabled: true
+  name: gitea-db
+  storage:
+    size: 8Gi
+    storageClassName: hostpath-provisioner

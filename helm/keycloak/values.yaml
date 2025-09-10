@@ -1,5 +1,13 @@
 namespace: keycloak
 
+# Database configuration
+database:
+  type: cnpg  # Options: cnpg, postgres
+  cnpg:
+    enabled: true
+  postgres:
+    enabled: false
+
 secrets:
   postgres:
     name: postgres-credentials

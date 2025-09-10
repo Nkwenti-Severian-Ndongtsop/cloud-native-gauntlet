@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitea
+  labels:
+    {{- include "gitea.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gitea
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gitea
+    spec:
+      containers:
+        - name: gitea
+          image: "{{ .Values.gitea.image.repository }}:{{ .Values.gitea.image.tag }}"
+          env:
+            - name: GITEA__DATABASE__DB_TYPE
+              value: "{{ .Values.gitea.database.type }}"
+            - name: GITEA__DATABASE__HOST
+              value: "{{ .Values.gitea.database.host }}:{{ .Values.gitea.database.port }}"
+            - name: GITEA__DATABASE__NAME
+              value: "{{ .Values.gitea.database.name }}"
+            - name: GITEA__DATABASE__USER
+              value: "{{ .Values.gitea.database.user }}"
+            - name: GITEA__DATABASE__PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gitea.database.existingSecret }}
+                  key: password
+          ports:
+            - name: http
+              containerPort: 3000
+            - name: ssh
+              containerPort: 22
+          volumeMounts:
+            - name: gitea-data
+              mountPath: /data
+      volumes:
+        - name: gitea-data
+          persistentVolumeClaim:
+            claimName: gitea-data-pvc

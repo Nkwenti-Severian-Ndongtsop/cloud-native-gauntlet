@@ -26,20 +26,31 @@ terraform {
 
 provider "null" {}
 
-# Kubernetes provider; will use KUBECONFIG env var or default kube config on host
-provider "kubernetes" {}
+# Kubernetes provider; will use the kubeconfig file fetched from the VM
+provider "kubernetes" {
+  config_path = "${path.module}/kubeconfig"
+}
 
-# Helm provider configured to use same context via KUBECONFIG
-provider "helm" {}
-
-# Bring up Vagrant VMs (when executed on the host). Skips gracefully if Vagrant is unavailable.
-resource "null_resource" "vagrant_up" {
-  provisioner "local-exec" {
-    command = "bash -lc 'cd ${path.module}/.. && if command -v vagrant >/dev/null 2>&1; then vagrant up --provision; else echo \"vagrant not found; skipping VM bring-up.\"; fi'"
+# Helm provider configured to use the same kubeconfig
+provider "helm" {
+  kubernetes {
+    config_path = "${path.module}/kubeconfig"
   }
 }
 
-# Fetch kubeconfig from the master VM and rewrite the API server address to master IP
+# Bring up cloud-gauntlet VM using Vagrant
+resource "null_resource" "vagrant_up" {
+  provisioner "local-exec" {
+    command = "bash -lc 'cd ${path.module}/.. && vagrant up cloud-gauntlet --provision'"
+  }
+  
+  provisioner "local-exec" {
+    when = destroy
+    command = "bash -lc 'cd ${path.module}/.. && vagrant destroy cloud-gauntlet -f'"
+  }
+}
+
+# Fetch kubeconfig from the cloud-gauntlet VM and rewrite the API server address to VM IP
 resource "null_resource" "fetch_kubeconfig" {
   depends_on = [null_resource.vagrant_up]
 
@@ -48,17 +59,18 @@ resource "null_resource" "fetch_kubeconfig" {
   }
 
   provisioner "local-exec" {
-    command = "bash -lc 'if command -v vagrant >/dev/null 2>&1; then vagrant ssh k3s-master -c \"sudo cat /etc/rancher/k3s/k3s.yaml\" > \"${path.module}/kubeconfig.raw\" && sed -E \"s#server: https?://127.0.0.1:6443#server: https://${var.k3s_master_ip}:6443#g\" \"${path.module}/kubeconfig.raw\" > \"${path.module}/kubeconfig\" && rm -f \"${path.module}/kubeconfig.raw\"; else echo \"vagrant not found; provide kubeconfig_path manually if needed.\"; fi'"
+    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo cat /etc/rancher/k3s/k3s.yaml\" > \"${path.module}/kubeconfig.raw\" && sed -E \"s#server: https?://127.0.0.1:6443#server: https://${var.k3s_master_ip}:6443#g\" \"${path.module}/kubeconfig.raw\" > \"${path.module}/kubeconfig\" && rm -f \"${path.module}/kubeconfig.raw\"'"
   }
 }
 
 # Ensure master is control-plane only and worker runs workloads
 resource "null_resource" "k8s_node_prep" {
-  depends_on = [null_resource.provision_infrastructure]
+  depends_on = [null_resource.fetch_kubeconfig]
 
   provisioner "local-exec" {
-    # Run directly on the host where Terraform is executed (when run inside the master VM)
-    command = "kubectl taint nodes k3s-master node-role.kubernetes.io/control-plane=true:NoSchedule --overwrite && kubectl label nodes k3s-master node-role.kubernetes.io/control-plane=true --overwrite && kubectl label nodes k3s-worker node-role.kubernetes.io/worker=true --overwrite"
+    # Run kubectl commands inside the VM where kubectl is available
+    # In single VM setup, we only have one node (cloud-gauntlet-master)
+    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo kubectl label nodes cloud-gauntlet-master node-role.kubernetes.io/control-plane=true --overwrite && sudo kubectl label nodes cloud-gauntlet-master node-role.kubernetes.io/worker=true --overwrite\"'"
   }
 }
 
@@ -72,7 +84,7 @@ resource "null_resource" "k8s_verify_nodes" {
   }
 
   provisioner "local-exec" {
-    command = "kubectl get nodes -o wide"
+    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo kubectl get nodes -o wide\"'"
   }
 }
 

@@ -1,11 +1,5 @@
 terraform {
-  required_version = ">= 1.4.0"
-
   required_providers {
-    local = {
-      source  = "hashicorp/local"
-      version = ">= 2.4.0"
-    }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = ">= 2.23.0"
@@ -14,13 +8,11 @@ terraform {
       source  = "hashicorp/helm"
       version = ">= 2.11.0"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = ">= 2.4.0"
+    }
   }
-}
-
-# Use explicit kubeconfig path passed from root
-variable "kubeconfig_path" {
-  description = "Path to kubeconfig file on host"
-  type        = string
 }
 
 provider "kubernetes" {
@@ -28,42 +20,118 @@ provider "kubernetes" {
 }
 
 provider "helm" {
-  # This section configures the Helm provider to use the Kubernetes provider's context
-  # It automatically inherits configuration from the kubernetes provider
+  kubernetes = {
+    config_path = var.kubeconfig_path
+  }
 }
 
-variable "helm_charts_root_rel" {
-  description = "Relative path (from repository root) to directory with Helm chart folders."
+variable "kubeconfig_path" {
+  description = "Path to the kubeconfig file"
   type        = string
-  default     = "helm"
 }
 
-locals {
-  repo_root         = abspath("${path.module}/..")
-  helm_charts_root  = abspath("${local.repo_root}/../${var.helm_charts_root_rel}")
-  helm_chart_files  = fileset(local.helm_charts_root, "**/Chart.yaml")
-  helm_chart_dirs   = [for f in local.helm_chart_files : dirname("${local.helm_charts_root}/${f}")]
-  helm_releases     = { for d in local.helm_chart_dirs : basename(d) => d }
+# Create namespaces
+resource "kubernetes_namespace_v1" "cnpg_namespace" {
+  metadata {
+    name = "cnpg-system"
+  }
 }
 
-resource "kubernetes_namespace_v1" "helm_namespaces" {
-  for_each = local.helm_releases
-
-  metadata { name = each.key }
+resource "kubernetes_namespace_v1" "keycloak_namespace" {
+  metadata {
+    name = "keycloak"
+  }
 }
 
-resource "helm_release" "local_charts" {
-  for_each = local.helm_releases
-
-  depends_on = [kubernetes_namespace_v1.helm_namespaces]
-
-  name              = each.key
-  chart             = each.value
-  namespace         = each.key
-  create_namespace  = false
-  dependency_update = true
-  timeout           = 600
-  wait              = true
+resource "kubernetes_namespace_v1" "gitea_namespace" {
+  metadata {
+    name = "gitea"
+  }
 }
 
+resource "kubernetes_namespace_v1" "argocd_namespace" {
+  metadata {
+    name = "argocd"
+  }
+}
 
+# Deploy CNPG Operator using Helm
+resource "helm_release" "cnpg_operator" {
+  name       = "cnpg-operator"
+  repository = "https://cloudnative-pg.github.io/charts"
+  chart      = "cloudnative-pg"
+  version    = "0.20.0"
+  namespace  = kubernetes_namespace_v1.cnpg_namespace.metadata[0].name
+
+  depends_on = [kubernetes_namespace_v1.cnpg_namespace]
+}
+
+# Deploy Keycloak using local Helm chart
+resource "helm_release" "keycloak" {
+  name       = "keycloak"
+  chart      = "${path.module}/../../helm/keycloak"
+  namespace  = kubernetes_namespace_v1.keycloak_namespace.metadata[0].name
+
+  depends_on = [
+    kubernetes_namespace_v1.keycloak_namespace,
+    helm_release.cnpg_operator
+  ]
+}
+
+# Deploy Gitea using local Helm chart
+resource "helm_release" "gitea" {
+  name       = "gitea"
+  chart      = "${path.module}/../../helm/gitea"
+  namespace  = kubernetes_namespace_v1.gitea_namespace.metadata[0].name
+
+  depends_on = [
+    kubernetes_namespace_v1.gitea_namespace,
+    helm_release.cnpg_operator
+  ]
+}
+
+# Deploy ArgoCD using kubectl apply (since it's not a Helm chart)
+resource "null_resource" "argocd_install" {
+  depends_on = [kubernetes_namespace_v1.argocd_namespace]
+
+  provisioner "local-exec" {
+    command = "kubectl apply -f ${path.module}/../../helm/argocd/install.yaml"
+  }
+
+  provisioner "local-exec" {
+    when = destroy
+    command = "kubectl delete -f ${path.module}/../../helm/argocd/install.yaml --ignore-not-found=true"
+  }
+}
+
+# Deploy ArgoCD Application for infrastructure
+resource "null_resource" "argocd_infra_app" {
+  depends_on = [null_resource.argocd_install]
+
+  provisioner "local-exec" {
+    command = "kubectl apply -f ${path.module}/../../helm/argocd/infra-app.yaml"
+  }
+
+  provisioner "local-exec" {
+    when = destroy
+    command = "kubectl delete -f ${path.module}/../../helm/argocd/infra-app.yaml --ignore-not-found=true"
+  }
+}
+
+# Output useful information
+output "namespaces" {
+  value = [
+    kubernetes_namespace_v1.cnpg_namespace.metadata[0].name,
+    kubernetes_namespace_v1.keycloak_namespace.metadata[0].name,
+    kubernetes_namespace_v1.gitea_namespace.metadata[0].name,
+    kubernetes_namespace_v1.argocd_namespace.metadata[0].name
+  ]
+}
+
+output "helm_releases" {
+  value = [
+    helm_release.cnpg_operator.name,
+    helm_release.keycloak.name,
+    helm_release.gitea.name
+  ]
+}

@@ -12,7 +12,7 @@
     path: /etc/hosts
     line: "{{ k3s_master_ip }} kubernetes kubernetes.default.svc.cluster.local"
     state: present
-  when: node_role == 'master'
+  when: inventory_hostname in groups['k3s_masters']
 
 - name: Add local domain entries for applications
   lineinfile:

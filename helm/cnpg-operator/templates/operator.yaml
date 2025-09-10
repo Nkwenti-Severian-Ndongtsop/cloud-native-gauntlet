@@ -1,8 +1,8 @@
-apiVersion: apps.kubernetes.io/v1
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Values.operator.fullnameOverride }}
-  namespace: default # Deploy to default namespace
+  namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
@@ -18,8 +18,17 @@ spec:
         - name: operator
           image: "{{ .Values.operator.image.name }}:{{ .Values.operator.image.tag }}"
           imagePullPolicy: IfNotPresent
+          args:
+            - controller
           env:
             - name: CNPG_POD_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: "0.5"
+            requests:
+              memory: 256Mi
+              cpu: "0.1"

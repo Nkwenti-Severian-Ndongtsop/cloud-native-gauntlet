@@ -1,3 +1,4 @@
+{{- if and .Values.database.cnpg.enabled (eq .Values.database.type "cnpg") }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -11,11 +12,10 @@ spec:
     storageClass: standard
   superuserSecret:
     name: {{ .Values.secrets.postgres.name }}
-  databases:
-    - name: {{ .Values.deployments.postgres.db.name }}
-      owner: {{ .Values.secrets.postgres.admin.name }}
   bootstrap:
     initdb:
+      database: {{ .Values.deployments.postgres.db.name }}
+      owner: {{ .Values.secrets.postgres.admin.name }}
       dataChecksums: true
   
   # Configure health and readiness probes
@@ -24,3 +24,4 @@ spec:
     podMonitor:
       labels:
         release: prometheus-stack
+{{- end }}

@@ -1,0 +1,18 @@
+{{- if and .Values.database.cnpg.enabled (eq .Values.database.type "cnpg") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.deployments.postgres.service.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/instance: {{ .Values.deployments.postgres.service.name }}
+spec:
+  ports:
+    - name: postgres
+      port: {{ .Values.deployments.postgres.service.port }}
+      targetPort: 5432
+  selector:
+    postgresql.cnpg.io/cluster: {{ .Values.deployments.postgres.service.name }}
+  type: ClusterIP
+{{- end }}

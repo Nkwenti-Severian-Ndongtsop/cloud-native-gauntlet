@@ -16,9 +16,4 @@
     - k3s_control_plane
   tags: [master]
 
-- name: Configure K3s worker nodes
-  hosts: k3s_workers
-  become: true
-  roles:
-    - k3s_worker
-  tags: [worker]
+# Worker nodes are now configured as part of the master role on the same VM
