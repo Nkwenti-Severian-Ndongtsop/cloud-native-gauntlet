@@ -47,7 +47,7 @@ deployments:
 
 pv:
   name: postgres-pv
-  size: 1Gi
+  size: 512Mi
 pvc:
   name: postgres-pvc
-  size: 1Gi
+  size: 512Mi
