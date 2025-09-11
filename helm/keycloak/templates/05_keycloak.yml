@@ -23,6 +23,8 @@ metadata:
     app: "{{ .Values.deployments.keycloak.service.name }}"
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: "{{ .Values.deployments.keycloak.service.name }}"
@@ -55,7 +57,7 @@ spec:
             - name: KC_METRICS_ENABLED
               value: "true"
             - name: KC_HOSTNAME_STRICT_HTTPS
-              value: "true"
+              value: "false"
             - name: KC_LOG_LEVEL
               value: INFO
             - name: KC_DB
@@ -75,28 +77,11 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.deployments.keycloak.ports.containerPort }}
-          readinessProbe:
-            httpGet:
-              path: /health/ready
-              port: {{ .Values.deployments.keycloak.ports.containerPort }}
-            initialDelaySeconds: 120
-            periodSeconds: 10
-          startupProbe:
-            httpGet:
-              path: /health/ready
-              port: {{ .Values.deployments.keycloak.ports.containerPort }}
-            failureThreshold: 60
-            periodSeconds: 5
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: {{ .Values.deployments.keycloak.ports.containerPort }}
-            initialDelaySeconds: 180
-            periodSeconds: 30
+          # Probes disabled for manual verification per request
           resources:
             limits:
-              memory: 512Mi
+              memory: 1536Mi
               cpu: "1"
             requests:
-              memory: 256Mi
-              cpu: "0.2"
+              memory: 1024Mi
+              cpu: "0.5"
