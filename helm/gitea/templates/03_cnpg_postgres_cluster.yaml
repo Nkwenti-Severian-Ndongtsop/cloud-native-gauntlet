@@ -10,7 +10,7 @@ spec:
   primaryUpdateStrategy: unsupervised
   storage:
     size: {{ .Values.postgresql.storage.size }}
-    storageClassName: hostpath-provisioner
+    storageClassName: {{ .Values.postgresql.storage.storageClassName | default "local-path" }}
   superuserSecret:
     name: {{ .Values.gitea.database.existingSecret }}
   enableSuperuserAccess: true
@@ -31,4 +31,4 @@ spec:
               - key: kubernetes.io/hostname
                 operator: In
                 values:
-                  - {{ .Values.global.k8s_node_name | default "k3s-control-plane-01" }}
+                  - {{ .Values.global.k8s_node_name | default "cloud-gauntlet-master" }}

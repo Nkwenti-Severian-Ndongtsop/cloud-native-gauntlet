@@ -81,6 +81,12 @@ spec:
               port: {{ .Values.deployments.keycloak.ports.containerPort }}
             initialDelaySeconds: 120
             periodSeconds: 10
+          startupProbe:
+            httpGet:
+              path: /health/ready
+              port: {{ .Values.deployments.keycloak.ports.containerPort }}
+            failureThreshold: 60
+            periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /health/live

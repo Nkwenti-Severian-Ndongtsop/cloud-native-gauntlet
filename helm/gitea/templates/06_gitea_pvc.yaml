@@ -10,4 +10,4 @@ spec:
   resources:
     requests:
       storage: 512Mi # Adjust size as needed for Gitea application data
-  storageClassName: hostpath-provisioner
+  storageClassName: local-path

@@ -71,8 +71,10 @@ resource "helm_release" "keycloak" {
   name       = "keycloak"
   chart      = "${path.module}/../../helm/keycloak"
   namespace  = kubernetes_namespace_v1.keycloak_namespace.metadata[0].name
-    wait       = false
+  wait       = false
   timeout    = 900
+  force_update = true
+  recreate_pods = true
 
   depends_on = [
     kubernetes_namespace_v1.keycloak_namespace,
@@ -87,6 +89,8 @@ resource "helm_release" "gitea" {
   namespace  = kubernetes_namespace_v1.gitea_namespace.metadata[0].name
   wait       = false
   timeout    = 900
+  force_update = true
+  recreate_pods = true
 
   depends_on = [
     kubernetes_namespace_v1.gitea_namespace,

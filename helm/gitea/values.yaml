@@ -1,5 +1,5 @@
 global:
-  k8s_node_name: k3s-control-plane-01
+  k8s_node_name: cloud-gauntlet-master
 gitea:
   image:
     repository: gitea/gitea
@@ -21,4 +21,4 @@ postgresql:
   name: gitea-db
   storage:
     size: 512Mi
-    storageClassName: hostpath-provisioner
+    storageClassName: local-path

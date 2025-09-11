@@ -115,7 +115,8 @@ resource "null_resource" "workloads_apply" {
   ]
 
   triggers = {
-    helm_hash = local.helm_files_hash
+    # Reconcile Helm releases on every apply (idempotent)
+    always_run = timestamp()
   }
 
   provisioner "local-exec" {
