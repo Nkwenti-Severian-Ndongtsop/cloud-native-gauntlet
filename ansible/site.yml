@@ -5,6 +5,8 @@
   roles:
     - common
     - dns
+    - docker
+    - registry
   tags: [all]
 
 - name: Configure K3s master node

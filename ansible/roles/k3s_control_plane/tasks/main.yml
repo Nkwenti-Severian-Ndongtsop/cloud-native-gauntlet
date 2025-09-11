@@ -18,6 +18,46 @@
   register: k3s_install
   changed_when: k3s_install.rc == 0
 
+- name: Configure containerd registries mirrors for local registry
+  become: yes
+  copy:
+    dest: /etc/rancher/k3s/registries.yaml
+    content: |
+      mirrors:
+        "docker.io":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "quay.io":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "ghcr.io":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "public.ecr.aws":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "registry.k8s.io":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "cr.l5d.io":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "{{ registry_host }}:{{ registry_port }}":
+          endpoint:
+            - "http://{{ registry_host }}:{{ registry_port }}"
+        "localhost:5000":
+          endpoint:
+            - "http://localhost:5000"
+      configs:
+        "{{ registry_host }}:{{ registry_port }}":
+          tls:
+            insecure_skip_verify: true
+        "localhost:5000":
+          tls:
+            insecure_skip_verify: true
+  notify: Restart k3s
+  when: registry_host is defined and registry_port is defined
+
 - name: Debug K3s installation output
   copy:
     content: "{{ k3s_install.stdout | default('') }}\n{{ k3s_install.stderr | default('') }}\nReturn Code: {{ k3s_install.rc }}"

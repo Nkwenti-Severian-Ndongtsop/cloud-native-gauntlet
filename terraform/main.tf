@@ -70,6 +70,26 @@ resource "null_resource" "k8s_node_prep" {
   }
 }
 
+# Preload images into local registry inside the VM before workloads
+resource "null_resource" "preload_images" {
+  depends_on = [null_resource.provision_infrastructure]
+
+  triggers = {
+    script_hash = filesha1("${path.module}/../scripts/prepare-offline-images.sh")
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOC
+      bash -lc 'cd ${path.module}/.. && vagrant ssh cloud-gauntlet -c "bash -lc \"cd /vagrant && bash scripts/prepare-offline-images.sh\""'
+    EOC
+  }
+
+  provisioner "local-exec" {
+    command = "bash -lc 'true'"
+    when    = destroy
+  }
+}
+
 # Optional: verify nodes state
 resource "null_resource" "k8s_verify_nodes" {
   depends_on = [null_resource.k8s_node_prep]
@@ -111,7 +131,8 @@ locals {
 resource "null_resource" "workloads_apply" {
   depends_on = [
     null_resource.k8s_node_prep,
-    null_resource.fetch_kubeconfig
+    null_resource.fetch_kubeconfig,
+    null_resource.preload_images
   ]
 
   triggers = {

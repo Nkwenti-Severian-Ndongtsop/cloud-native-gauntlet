@@ -2,7 +2,7 @@ global:
   k8s_node_name: cloud-gauntlet-master
 gitea:
   image:
-    repository: gitea/gitea
+    repository: localhost:5000/gitea/gitea
     tag: 1.20.5
   ingress:
     enabled: true

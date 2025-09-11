@@ -19,14 +19,17 @@ IMAGES=(
   
   # Day 6-7: Database & Deployment - CNPG
   "ghcr.io/cloudnative-pg/cloudnative-pg:1.20.0"
+  "ghcr.io/cloudnative-pg/postgresql:14"
   "postgres:14-alpine"
   
   # Day 8: Keycloak
   "quay.io/keycloak/keycloak:26.3.3"
   
   # Day 9-10: GitOps - Gitea and ArgoCD
-  "gitea/gitea:1.24.5"
-  "argoproj/argocd:v2.6.15"
+  "gitea/gitea:1.20.5"
+  "quay.io/argoproj/argocd:v3.1.5"
+  "ghcr.io/dexidp/dex:v2.43.0"
+  "public.ecr.aws/docker/library/redis:7.2.7-alpine"
   
   # Day 11: Service Mesh - Linkerd
   "cr.l5d.io/linkerd/controller:stable-2.14.7"
@@ -57,6 +60,8 @@ for image in "${IMAGES[@]}"; do
       local_tag_name="${image#cr.l5d.io/}"
     elif [[ "$image" == "ghcr.io/"* ]]; then
       local_tag_name="${image#ghcr.io/}"
+    elif [[ "$image" == "public.ecr.aws/"* ]]; then
+      local_tag_name="${image#public.ecr.aws/}"
     elif [[ "$image" == "rancher/mirrored-"* ]]; then
       if [[ "$image" == "rancher/mirrored-coredns-coredns:1.12.3" ]]; then
         local_tag_name="coredns/coredns:1.12.3"

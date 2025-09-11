@@ -47,6 +47,7 @@ deployments:
       name: keycloak
     ports:
       containerPort: 8080
+    image: "localhost:5000/quay.io/keycloak/keycloak:26.3.3"
   ingress:
     host: keycloak.local
 
