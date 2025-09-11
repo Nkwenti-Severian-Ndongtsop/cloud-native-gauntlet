@@ -13,33 +13,20 @@ terraform {
       source  = "hashicorp/local"
       version = ">= 2.4.0"
     }
-    kubernetes = {
-      source  = "hashicorp/kubernetes"
-      version = ">= 2.23.0"
-    }
-    helm = {
-      source  = "hashicorp/helm"
-      version = ">= 2.11.0"
-    }
   }
 }
 
 provider "null" {}
 
 # Kubernetes provider; will use the kubeconfig file fetched from the VM
-provider "kubernetes" {
-  config_path = "${path.module}/kubeconfig"
-}
-
-# Helm provider configured to use the same kubeconfig
-provider "helm" {
-  kubernetes {
-    config_path = "${path.module}/kubeconfig"
-  }
-}
+# Intentionally no kubernetes/helm providers at root to avoid early provider init
 
 # Bring up cloud-gauntlet VM using Vagrant
 resource "null_resource" "vagrant_up" {
+  # Ensure this runs on every apply so the VM is up before any Kubernetes work
+  triggers = {
+    always_run = timestamp()
+  }
   provisioner "local-exec" {
     command = "bash -lc 'cd ${path.module}/.. && vagrant up cloud-gauntlet --provision'"
   }
@@ -52,7 +39,7 @@ resource "null_resource" "vagrant_up" {
 
 # Fetch kubeconfig from the cloud-gauntlet VM and rewrite the API server address to VM IP
 resource "null_resource" "fetch_kubeconfig" {
-  depends_on = [null_resource.vagrant_up]
+  depends_on = [null_resource.provision_infrastructure]
 
   triggers = {
     master_ip = var.k3s_master_ip
@@ -155,8 +142,8 @@ resource "null_resource" "provision_infrastructure" {
   }
 
   provisioner "local-exec" {
-    # When running inside the master VM, ansible may not be installed. Skip gracefully if missing.
-    command = "bash -lc 'cd ${path.module}/.. && if command -v ansible-playbook >/dev/null 2>&1; then ansible-playbook -i ansible/hosts.ini ansible/site.yml; else echo \"ansible-playbook not found on this host. Skipping Ansible provisioning.\"; fi'"
+    # Run Ansible from host to provision the VM
+    command = "bash -lc 'cd ${path.module}/.. && ansible-playbook -i ansible/hosts.ini ansible/site.yml'"
   }
 }
 

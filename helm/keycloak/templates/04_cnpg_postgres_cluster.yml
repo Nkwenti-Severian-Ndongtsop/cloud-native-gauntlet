@@ -9,32 +9,22 @@ spec:
   imageName: "{{ .Values.deployments.postgres.image.name }}"
   storage:
     size: {{ .Values.pv.size }}
-    storageClass: hostpath-provisioner
+    storageClass: local-path
   superuserSecret:
     name: {{ .Values.secrets.postgres.name }}
   bootstrap:
     initdb:
       database: {{ .Values.deployments.postgres.db.name }}
       owner: {{ .Values.secrets.postgres.admin.name }}
+      secret:
+        name: {{ .Values.secrets.postgres.name }}
       dataChecksums: true
-  
+  # Keep defaults for single-instance cluster; CNPG manages safe defaults
   # Configure health and readiness probes
   monitoring:
     enablePodMonitor: true
     podMonitor:
       labels:
         release: prometheus-stack
-  
-  # Ensure data persistence and recovery
-  postgresql:
-    parameters:
-      wal_level: replica
-      max_wal_senders: 3
-      max_replication_slots: 3
-      hot_standby: "on"
-      archive_mode: "on"
-      archive_command: "test ! -f /controller/archive/%f && cp %p /controller/archive/%f"
-  
-  # Enable superuser access for maintenance
-  enableSuperuserAccess: true
+{{- end }}        release: prometheus-stack
 {{- end }}

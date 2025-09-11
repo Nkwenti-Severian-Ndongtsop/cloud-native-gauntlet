@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   name: "{{ .Values.deployments.keycloak.service.name }}"
   namespace: "{{ .Values.namespace }}"
+  annotations:
+    kubernetes.io/ingress.class: traefik
 spec:
   rules:
     - host: "{{ .Values.deployments.ingress.host }}"
@@ -15,5 +17,7 @@ spec:
                 name: "{{ .Values.deployments.keycloak.service.name }}"
                 port:
                   number: {{ .Values.deployments.securePort }}
+
+
 
 

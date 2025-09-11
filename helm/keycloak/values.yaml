@@ -1,5 +1,8 @@
 namespace: keycloak
 
+# Whether this chart should create the namespace
+createNamespace: false
+
 # Database configuration
 database:
   type: cnpg  # Options: cnpg, postgres
@@ -20,6 +23,8 @@ secrets:
     key: ""
   keycloak:
     name: keycloak-secrets
+    # Set to true only on first install; then set to false to avoid duplicate admin creation
+    bootstrap: false
     admin:
       name: nkwenti
       password: password
@@ -28,7 +33,7 @@ deployments:
   securePort: 80
   postgres:
     image:
-      name: postgres:14-alpine
+      name: ghcr.io/cloudnative-pg/postgresql:14
     db:
       name: keycloak
     service:

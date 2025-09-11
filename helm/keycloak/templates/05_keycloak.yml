@@ -33,9 +33,10 @@ spec:
     spec:
       containers:
         - name: "{{ .Values.deployments.keycloak.service.name }}"
-          image: quay.io/keycloak/keycloak:21.0.2
+          image: quay.io/keycloak/keycloak:26.3.3
           args: ["start-dev"]
           env:
+            {{- if .Values.secrets.keycloak.bootstrap }}
             - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:
@@ -46,6 +47,7 @@ spec:
                 secretKeyRef:
                   key: KEYCLOAK_ADMIN_PASSWORD
                   name: "{{ .Values.secrets.keycloak.name }}"
+            {{- end }}
             - name: KC_PROXY
               value: "edge"
             - name: KC_HEALTH_ENABLED
@@ -59,7 +61,7 @@ spec:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: "jdbc:postgresql://{{ .Values.deployments.postgres.service.name }}/{{ .Values.deployments.postgres.db.name }}"
+              value: "jdbc:postgresql://{{ .Values.deployments.postgres.service.name }}-rw.{{ .Values.namespace }}.svc/{{ .Values.deployments.postgres.db.name }}"
             - name: KC_DB_USERNAME
               valueFrom:
                 secretKeyRef:
@@ -77,13 +79,13 @@ spec:
             httpGet:
               path: /health/ready
               port: {{ .Values.deployments.keycloak.ports.containerPort }}
-            initialDelaySeconds: 60
+            initialDelaySeconds: 120
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /health/live
               port: {{ .Values.deployments.keycloak.ports.containerPort }}
-            initialDelaySeconds: 120
+            initialDelaySeconds: 180
             periodSeconds: 30
           resources:
             limits:

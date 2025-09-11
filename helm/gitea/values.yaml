@@ -7,7 +7,7 @@ gitea:
   ingress:
     enabled: true
     host: gitea.local
-    className: nginx
+    className: traefik
   database:
     type: postgres
     host: gitea-db

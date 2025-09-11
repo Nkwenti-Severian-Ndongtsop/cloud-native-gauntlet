@@ -1,3 +1,5 @@
+{{- /* Only create static PV/PVC when using the legacy postgres deployment */ -}}
+{{- if and .Values.database.postgres.enabled (eq .Values.database.type "postgres") }}
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -21,3 +23,7 @@ spec:
   resources:
     requests:
       storage: {{ .Values.pvc.size }}
+{{- end }}
+
+      storage: {{ .Values.pvc.size }}
+{{- end }}
