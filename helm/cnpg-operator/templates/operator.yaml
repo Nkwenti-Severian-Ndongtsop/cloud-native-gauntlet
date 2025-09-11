@@ -3,6 +3,8 @@ kind: Deployment
 metadata:
   name: {{ .Values.operator.fullnameOverride }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Values.operator.fullnameOverride }}
 spec:
   replicas: 1
   selector:
@@ -13,11 +15,49 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Values.operator.fullnameOverride }}
     spec:
+      # Pod-level security context, allowing main container to run as non-root and access volume
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
       serviceAccountName: {{ .Values.operator.fullnameOverride }}
+      initContainers:
+        - name: generate-webhook-certs
+          image: alpine:3.19
+          imagePullPolicy: Always
+          securityContext: # Specific security context for init container
+            runAsUser: 0 # Run as root for apk add and openssl
+            runAsGroup: 0
+            allowPrivilegeEscalation: true # Needed for apk add
+          command:
+            - sh
+            - -lc
+            - |
+              set -euo pipefail
+              apk add --no-cache openssl >/dev/null
+              mkdir -p /tmp/cnpg-pki
+              if [ ! -f /tmp/cnpg-pki/apiserver.key ] || [ ! -f /tmp/cnpg-pki/apiserver.crt ]; then
+                echo "Generating webhook certificates..."
+                openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
+                  -subj "/CN=cloudnative-pg-webhook" \
+                  -keyout /tmp/cnpg-pki/apiserver.key \
+                  -out /tmp/cnpg-pki/apiserver.crt >/dev/null 2>&1
+                chown 1000:1000 /tmp/cnpg-pki/apiserver.* # Transfer ownership to user 1000
+                chmod 0640 /tmp/cnpg-pki/apiserver.* # Set permissions
+                echo "Certificates generated:"
+                ls -l /tmp/cnpg-pki
+              else
+                echo "Certificates already exist:"
+                ls -l /tmp/cnpg-pki
+              fi
+              echo "Init container finished."
+          volumeMounts:
+            - name: cnpg-pki
+              mountPath: /tmp/cnpg-pki
       containers:
         - name: operator
           image: "{{ .Values.operator.image.name }}:{{ .Values.operator.image.tag }}"
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - controller
           env:
@@ -25,6 +65,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: OPERATOR_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: WEBHOOK_CERT_DIR
+              value: /tmp/cnpg-pki
           resources:
             limits:
               memory: 512Mi
@@ -32,3 +78,9 @@ spec:
             requests:
               memory: 256Mi
               cpu: "0.1"
+          volumeMounts:
+            - name: cnpg-pki
+              mountPath: /tmp/cnpg-pki
+      volumes:
+        - name: cnpg-pki
+          emptyDir: {}

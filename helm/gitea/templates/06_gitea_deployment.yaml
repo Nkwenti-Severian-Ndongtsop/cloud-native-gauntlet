@@ -17,6 +17,7 @@ spec:
       containers:
         - name: gitea
           image: "{{ .Values.gitea.image.repository }}:{{ .Values.gitea.image.tag }}"
+          imagePullPolicy: Always
           env:
             - name: GITEA__DATABASE__DB_TYPE
               value: "{{ .Values.gitea.database.type }}"

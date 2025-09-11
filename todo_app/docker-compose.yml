@@ -12,21 +12,5 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  app:
-    # Use the image we just built.
-    image: gauntlet-app:latest
-    restart: always
-    environment:
-      # The hostname `db` refers to the postgres service defined above.
-      DATABASE_URL: "postgres://user:password@db:5432/database"
-      # Used by the runtime when auth is enabled
-      KEYCLOAK_URL: "http://keycloak.local"
-      KEYCLOAK_REALM: "todo-app"
-    ports:
-      # Map port 3000 on your machine to port 3000 in the container.
-      - "3000:3000"
-    depends_on:
-      - db
-
 volumes:
   postgres_data:

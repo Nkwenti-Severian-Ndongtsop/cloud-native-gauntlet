@@ -17,6 +17,9 @@ IMAGES=(
   "quay.io/argoproj/argocd:v3.1.5"
   "ghcr.io/dexidp/dex:v2.43.0"
   "public.ecr.aws/docker/library/redis:7.2.7-alpine"
+
+  #todo-api
+  "ghcr.io/nkwenti-severian-ndongtsop/todo-api:latest"
 )
 
 # Create directories for offline packages

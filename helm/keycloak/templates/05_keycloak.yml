@@ -36,6 +36,7 @@ spec:
       containers:
         - name: "{{ .Values.deployments.keycloak.service.name }}"
           image: {{ .Values.deployments.keycloak.image | default "192.168.56.10:5000/keycloak/keycloak:26.3.3" }}
+          imagePullPolicy: Always
           args: ["start-dev"]
           env:
             {{- if .Values.secrets.keycloak.bootstrap }}
