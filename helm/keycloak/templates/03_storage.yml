@@ -24,6 +24,3 @@ spec:
     requests:
       storage: {{ .Values.pvc.size }}
 {{- end }}
-
-      storage: {{ .Values.pvc.size }}
-{{- end }}

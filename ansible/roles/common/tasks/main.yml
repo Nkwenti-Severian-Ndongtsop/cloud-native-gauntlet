@@ -55,23 +55,12 @@
     force_apt_get: yes
   become: yes
 
-- name: Install common packages
+- name: Install minimal common packages
   apt:
-    name: "{{ item }}"
+    name:
+      - curl
+      - git
     state: present
-  with_items:
-    - curl
-    - wget
-    - git
-    - vim
-    - htop
-    - jq
-    - gnupg
-    - software-properties-common
-    - apt-transport-https
-    - ca-certificates
-    - python3-pip
-    - python3-apt
 
 - name: Set timezone to UTC
   timezone:
@@ -104,7 +93,7 @@
     - overlay
     - br_netfilter
 
-# Install Helm (official tarball)
+# Install Helm (official tarball) for template verification inside the VM
 - name: Set Helm version
   set_fact:
     helm_version: "{{ helm_version | default('v3.15.3') }}"

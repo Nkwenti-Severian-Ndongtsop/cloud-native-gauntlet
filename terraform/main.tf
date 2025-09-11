@@ -23,12 +23,21 @@ provider "null" {}
 
 # Bring up cloud-gauntlet VM using Vagrant
 resource "null_resource" "vagrant_up" {
-  # Ensure this runs on every apply so the VM is up before any Kubernetes work
-  triggers = {
-    always_run = timestamp()
-  }
   provisioner "local-exec" {
-    command = "bash -lc 'cd ${path.module}/.. && vagrant up cloud-gauntlet --provision'"
+    command = <<-EOT
+      bash -lc '
+        cd ${path.module}/..
+        state=$(vagrant status cloud-gauntlet --machine-readable | awk -F, "/,state-human-short,/ {st=\$4} END {print st}")
+        case "$state" in
+          running)
+            echo "VM already running" ;;
+          poweroff|aborted|saved)
+            echo "Starting VM without provisioning" ; vagrant up cloud-gauntlet --no-provision ;;
+          *)
+            echo "Bringing up VM with provisioning" ; vagrant up cloud-gauntlet --provision ;;
+        esac
+      '
+    EOT
   }
   
   provisioner "local-exec" {
@@ -42,11 +51,11 @@ resource "null_resource" "fetch_kubeconfig" {
   depends_on = [null_resource.provision_infrastructure]
 
   triggers = {
-    master_ip = var.k3s_master_ip
+    master_ip  = var.k3s_master_ip
   }
 
   provisioner "local-exec" {
-    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo cat /etc/rancher/k3s/k3s.yaml\" > \"${path.module}/kubeconfig.raw\" && sed -E \"s#server: https?://127.0.0.1:6443#server: https://${var.k3s_master_ip}:6443#g\" \"${path.module}/kubeconfig.raw\" > \"${path.module}/kubeconfig\" && rm -f \"${path.module}/kubeconfig.raw\"'"
+    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo cat /etc/rancher/k3s/k3s.yaml\" > \"${path.module}/kubeconfig.raw\" && sed -E \"/^Warning:|^Install it with:/d;s#server: https?://127.0.0.1:6443#server: https://${var.k3s_master_ip}:6443#g\" \"${path.module}/kubeconfig.raw\" > \"${path.module}/kubeconfig\" && rm -f \"${path.module}/kubeconfig.raw\"'"
   }
 }
 

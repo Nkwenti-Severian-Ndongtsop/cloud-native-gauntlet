@@ -11,7 +11,7 @@ NODES = {
     :ip => '192.168.56.10',
     :cpus => 4,
     :memory => 6144,
-    :roles => ['master', 'worker'],
+    :roles => ['master'],
     :hostname => 'cloud-gauntlet'
   }
 }
@@ -84,11 +84,5 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   else
     puts "Warning: vagrant-hostmanager plugin not found. Hosts file won't be updated automatically."
     puts "Install it with: vagrant plugin install vagrant-hostmanager"
-    
-    # Manually add hosts entries to /etc/hosts if hostmanager is not available
-    config.vm.provision "shell", inline: <<-SHELL
-      echo "Updating /etc/hosts file..."
-      #{NODES.map { |name, config| "echo '#{config[:ip]} #{name}' | sudo tee -a /etc/hosts" }.join("\n      ")}
-    SHELL
   end
 end

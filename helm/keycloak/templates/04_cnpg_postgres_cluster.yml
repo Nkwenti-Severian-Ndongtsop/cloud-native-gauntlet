@@ -26,5 +26,4 @@ spec:
     podMonitor:
       labels:
         release: prometheus-stack
-{{- end }}        release: prometheus-stack
 {{- end }}
