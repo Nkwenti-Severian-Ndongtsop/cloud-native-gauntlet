@@ -1,38 +1,22 @@
 #!/bin/bash
 set -e
 
-# Define images to pre-pull for the 12-day cloud-native gauntlet
+# Images actually used by current manifests
 IMAGES=(
-  # Day 1-2: Cluster Beasts - K3s and core components
-  "rancher/k3s:v1.31.12-k3s1"
-  "rancher/klipper-helm:v0.9.7-build20250616"
-  "rancher/local-path-provisioner:v0.0.32"
-  "rancher/mirrored-coredns-coredns:1.12.3"
-  "rancher/mirrored-metrics-server:v0.8.0"
-  "rancher/mirrored-pause:3.9"
-  "registry:3.0.0"
-  "debian:bookworm-slim"
-  
-  # Day 3-4: Application - Rust build tools
-  "rust:1.87-slim"
-  "alpine:3.22.1"
-  
-  # Day 6-7: Database & Deployment - CNPG
+  # CNPG
   "ghcr.io/cloudnative-pg/cloudnative-pg:1.20.0"
   "ghcr.io/cloudnative-pg/postgresql:14"
-  "postgres:14-alpine"
-  
-  # Day 8: Keycloak
+
+  # Keycloak
   "quay.io/keycloak/keycloak:26.3.3"
-  
-  # Day 9-10: GitOps - Gitea and ArgoCD
+
+  # Gitea
   "gitea/gitea:1.20.5"
+
+  # ArgoCD stack
   "quay.io/argoproj/argocd:v3.1.5"
   "ghcr.io/dexidp/dex:v2.43.0"
   "public.ecr.aws/docker/library/redis:7.2.7-alpine"
-  
-  # Day 11: Service Mesh - Linkerd
-  "cr.l5d.io/linkerd/controller:stable-2.14.7"
 )
 
 # Create directories for offline packages
@@ -42,11 +26,6 @@ mkdir -p offline-images
 for image in "${IMAGES[@]}"; do
   echo "Pulling $image..."
   docker pull "$image"
-  
-  # Save the image to a tar file
-  filename=$(echo "$image" | sed 's/[^a-zA-Z0-9._-]/-/g').tar
-  echo "Saving $image to offline-images/$filename"
-  docker save -o "offline-images/$filename" "$image"
   
   # Tag and push to local registry if running
   if docker ps | grep -q registry; then
@@ -82,8 +61,9 @@ for image in "${IMAGES[@]}"; do
       local_tag_name="$image"
     fi
     
-    docker tag "$image" "localhost:5000/$local_tag_name"
-    docker push "localhost:5000/$local_tag_name"
+    # Also tag and push to VM IP for cross-node clarity
+    docker tag "$image" "192.168.56.10:5000/$local_tag_name"
+    docker push "192.168.56.10:5000/$local_tag_name"
   fi
 done
 

@@ -1,6 +1,6 @@
 operator:
   fullnameOverride: cloudnative-pg
   image:
-    name: localhost:5000/ghcr.io/cloudnative-pg/cloudnative-pg
+    name: 192.168.56.10:5000/cloudnative-pg/cloudnative-pg
     tag: 1.20.0
   installCRDs: true

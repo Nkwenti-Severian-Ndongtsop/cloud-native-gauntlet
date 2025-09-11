@@ -58,10 +58,10 @@ resource "kubernetes_namespace_v1" "argocd_namespace" {
 # Deploy CNPG Operator using Helm
 resource "helm_release" "cnpg_operator" {
   name       = "cnpg-operator"
-  repository = "https://cloudnative-pg.github.io/charts"
-  chart      = "cloudnative-pg"
-  version    = "0.20.0"
+  chart      = "${path.module}/../../helm/cnpg-operator"
   namespace  = kubernetes_namespace_v1.cnpg_namespace.metadata[0].name
+  wait       = false
+  timeout    = 600
 
   depends_on = [kubernetes_namespace_v1.cnpg_namespace]
 }

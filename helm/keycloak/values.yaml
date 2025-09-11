@@ -33,7 +33,7 @@ deployments:
   securePort: 80
   postgres:
     image:
-      name: ghcr.io/cloudnative-pg/postgresql:14
+      name: 192.168.56.10:5000/cloudnative-pg/postgresql:14
     db:
       name: keycloak
     service:
@@ -46,8 +46,8 @@ deployments:
     service:
       name: keycloak
     ports:
-      containerPort: 8080
-    image: "localhost:5000/quay.io/keycloak/keycloak:26.3.3"
+      containerPort: 9000
+    image: "192.168.56.10:5000/keycloak/keycloak:26.3.3"
   ingress:
     host: keycloak.local
 

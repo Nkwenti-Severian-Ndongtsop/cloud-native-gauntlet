@@ -3,14 +3,6 @@ use sqlx::FromRow;
 use uuid::Uuid;
 use time::OffsetDateTime;
 
-#[derive(Debug, Serialize, FromRow)]
-pub struct User {
-    pub id: Uuid,
-    pub username: String,
-    // Note: We will not store passwords directly in a real app,
-    // but this is a placeholder until Keycloak handles it.
-}
-
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct Task {
     #[serde(default = "Uuid::new_v4")]
