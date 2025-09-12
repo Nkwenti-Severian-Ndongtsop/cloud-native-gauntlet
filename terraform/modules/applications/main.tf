@@ -215,11 +215,42 @@ resource "null_resource" "drone_setup" {
   ]
 }
 
-# Setup GitOps repositories and complete automation
-resource "null_resource" "gitops_setup" {
+# Setup GitOps repositories (Step 1: Gitea repos and code push)
+resource "null_resource" "gitops_repos_setup" {
   provisioner "local-exec" {
     command = <<-EOT
-      echo "⏳ Waiting for all services to be ready..."
+      echo "⏳ Waiting for Gitea to be ready..."
+      
+      # Wait for Gitea pod
+      timeout 300 bash -c "
+        while true; do
+          if vagrant ssh cloud-gauntlet -c 'kubectl get pods -n gitea -l app.kubernetes.io/name=gitea' | grep -q 'Running'; then
+            echo '✅ Gitea pod is running'
+            break
+          fi
+          echo 'Waiting for Gitea pod...'
+          sleep 10
+        done
+      "
+      
+      echo "🚀 Running GitOps repository setup (Step 1)..."
+      cd ${path.module}/../../../scripts && ./setup-gitops-repos.sh
+    EOT
+    
+    working_dir = path.module
+  }
+  
+  depends_on = [
+    null_resource.keycloak_setup,
+    helm_release.gitea
+  ]
+}
+
+# Setup ArgoCD and Drone automation (Step 2: ArgoCD Apps and Drone activation)
+resource "null_resource" "argocd_drone_setup" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "⏳ Waiting for ArgoCD and Drone to be ready..."
       
       # Wait for ArgoCD server pod
       timeout 300 bash -c "
@@ -233,16 +264,30 @@ resource "null_resource" "gitops_setup" {
         done
       "
       
-      echo "🚀 Running GitOps repository setup..."
-      cd ${path.module}/../../../scripts && ./setup-gitops-repos.sh
+      # Wait for Drone server pod
+      timeout 300 bash -c "
+        while true; do
+          if vagrant ssh cloud-gauntlet -c 'kubectl get pods -n drone -l app.kubernetes.io/name=drone' | grep -q 'Running'; then
+            echo '✅ Drone server pod is running'
+            break
+          fi
+          echo 'Waiting for Drone server pod...'
+          sleep 10
+        done
+      "
+      
+      echo "🚀 Running ArgoCD and Drone setup (Step 2)..."
+      cd ${path.module}/../../../scripts && ./setup-argocd-drone.sh
     EOT
     
     working_dir = path.module
   }
   
   depends_on = [
-    null_resource.keycloak_setup,
+    null_resource.gitops_repos_setup,
     null_resource.drone_setup,
-    helm_release.argocd
+    helm_release.argocd,
+    helm_release.drone,
+    helm_release.drone_runner
   ]
 }
