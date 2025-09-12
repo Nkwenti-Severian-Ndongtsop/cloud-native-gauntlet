@@ -1,0 +1,46 @@
+{{- if .Values.postgresql.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.postgresql.cluster.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-5"
+spec:
+  instances: {{ .Values.postgresql.cluster.instances }}
+  
+  # PostgreSQL image from local registry
+  imageName: "192.168.56.10:5000/postgres:13.11"
+  
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgresql.cluster.bootstrap.initdb.database }}
+      owner: {{ .Values.postgresql.cluster.bootstrap.initdb.owner }}
+      secret:
+        name: {{ .Values.postgresql.cluster.bootstrap.initdb.secret.name }}
+  
+  # Storage configuration
+  storage:
+    size: {{ .Values.postgresql.cluster.storage.size }}
+    {{- if .Values.postgresql.cluster.storage.storageClass }}
+    storageClass: {{ .Values.postgresql.cluster.storage.storageClass }}
+    {{- end }}
+  
+  # Resources
+  resources:
+    {{- toYaml .Values.postgresql.cluster.resources | nindent 4 }}
+  
+  # Enable superuser access
+  enableSuperuserAccess: {{ .Values.postgresql.cluster.enableSuperuserAccess }}
+  
+  # Monitoring
+  {{- if .Values.postgresql.cluster.monitoring.enabled }}
+  monitoring:
+    enabled: {{ .Values.postgresql.cluster.monitoring.enabled }}
+  {{- end }}
+{{- end }}

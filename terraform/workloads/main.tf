@@ -64,23 +64,32 @@ resource "kubernetes_namespace_v1" "argocd_namespace" {
   }
 }
 
-# Add CloudNativePG Helm repository
+resource "kubernetes_namespace_v1" "todo_namespace" {
+  metadata {
+    name = "todo"
+  }
+}
+
+resource "kubernetes_namespace_v1" "drone_namespace" {
+  metadata {
+    name = "drone"
+  }
+}
+
+# Deploy CloudNativePG Operator using local official Helm chart
 resource "helm_release" "cnpg_operator" {
-  name       = "cnpg"
-  repository = "https://cloudnative-pg.github.io/charts"
-  chart      = "cloudnative-pg"
-  namespace  = kubernetes_namespace_v1.cnpg_namespace.metadata[0].name
-  version    = "0.19.1"  # Use the latest stable version
-  wait       = true
-  timeout    = 1800
+  name      = "cnpg"
+  chart     = "../../helm/cloudnative-pg"
+  namespace = kubernetes_namespace_v1.cnpg_namespace.metadata[0].name
+  wait      = true
+  timeout   = 1800
   force_update = true
-  create_namespace = true
+  create_namespace = false
 
   values = [
     <<-EOT
     image:
-      registry: localhost:5000
-      repository: cloudnative-pg/cloudnative-pg
+      repository: 192.168.56.10:5000/cloudnative-pg/cloudnative-pg
       tag: "1.20.0"
       pullPolicy: IfNotPresent
     EOT
@@ -184,7 +193,153 @@ resource "helm_release" "gitea" {
   ]
 }
 
-# Deploy ArgoCD using kubectl apply (since it's not a Helm chart)
+# Deploy Todo App using local Helm chart
+resource "helm_release" "todo_app" {
+  name       = "todo-app"
+  chart      = "${path.module}/../../helm/todo-app"
+  namespace  = kubernetes_namespace_v1.todo_namespace.metadata[0].name
+  wait       = true
+  timeout    = 900
+  force_update = true
+  recreate_pods = true
+
+  depends_on = [
+    kubernetes_namespace_v1.todo_namespace,
+    helm_release.cnpg_operator
+  ]
+}
+
+# Deploy ArgoCD using official Helm chart
+resource "helm_release" "argocd" {
+  name       = "argocd"
+  chart      = "${path.module}/../../helm/argo-cd"
+  namespace  = kubernetes_namespace_v1.argocd_namespace.metadata[0].name
+  wait       = true
+  timeout    = 900
+  force_update = true
+  recreate_pods = true
+
+  values = [
+    <<-EOT
+    server:
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        hosts:
+          - argocd.local
+        paths:
+          - /
+        pathType: Prefix
+      service:
+        type: ClusterIP
+    
+    # Use local registry images for offline deployment
+    global:
+      image:
+        repository: 192.168.56.10:5000/argoproj/argocd
+        tag: v2.8.4
+    
+    controller:
+      image:
+        repository: 192.168.56.10:5000/argoproj/argocd
+        tag: v2.8.4
+    
+    dex:
+      image:
+        repository: 192.168.56.10:5000/dexidp/dex
+        tag: v2.37.0
+    
+    redis:
+      image:
+        repository: 192.168.56.10:5000/redis
+        tag: 7.0.11-alpine
+    EOT
+  ]
+
+  depends_on = [
+    kubernetes_namespace_v1.argocd_namespace
+  ]
+}
+
+# Deploy Drone Server using official Helm chart
+resource "helm_release" "drone" {
+  name       = "drone"
+  chart      = "${path.module}/../../helm/drone"
+  namespace  = kubernetes_namespace_v1.drone_namespace.metadata[0].name
+  wait       = true
+  timeout    = 900
+  force_update = true
+  recreate_pods = true
+
+  values = [
+    <<-EOT
+    image:
+      repository: 192.168.56.10:5000/drone/drone
+      tag: 2.20.0
+    
+    ingress:
+      enabled: true
+      className: traefik
+      hosts:
+        - host: drone.local
+          paths:
+            - path: /
+              pathType: Prefix
+    
+    env:
+      DRONE_GITEA_SERVER: "https://gitea.local"
+      DRONE_GITEA_CLIENT_ID: "drone"
+      DRONE_GITEA_CLIENT_SECRET: "drone-secret"
+      DRONE_RPC_SECRET: "drone-rpc-secret"
+      DRONE_SERVER_HOST: "drone.local"
+      DRONE_SERVER_PROTO: "https"
+    
+    persistentVolume:
+      enabled: true
+      storageClass: "local-path"
+      size: 8Gi
+    EOT
+  ]
+
+  depends_on = [
+    kubernetes_namespace_v1.drone_namespace,
+    helm_release.gitea
+  ]
+}
+
+# Deploy Drone Runner using official Helm chart
+resource "helm_release" "drone_runner" {
+  name       = "drone-runner"
+  chart      = "${path.module}/../../helm/drone-runner-kube"
+  namespace  = kubernetes_namespace_v1.drone_namespace.metadata[0].name
+  wait       = true
+  timeout    = 900
+  force_update = true
+  recreate_pods = true
+
+  values = [
+    <<-EOT
+    image:
+      repository: 192.168.56.10:5000/drone/drone-runner-kube
+      tag: 1.0.0-beta.9
+    
+    env:
+      DRONE_RPC_HOST: "drone.drone.svc.cluster.local"
+      DRONE_RPC_PROTO: "http"
+      DRONE_RPC_SECRET: "drone-rpc-secret"
+      DRONE_NAMESPACE_DEFAULT: "drone"
+    
+    rbac:
+      buildNamespaces:
+        - drone
+    EOT
+  ]
+
+  depends_on = [
+    kubernetes_namespace_v1.drone_namespace,
+    helm_release.drone
+  ]
+}
 
 # Output useful information
 output "namespaces" {
@@ -192,7 +347,9 @@ output "namespaces" {
     kubernetes_namespace_v1.cnpg_namespace.metadata[0].name,
     kubernetes_namespace_v1.keycloak_namespace.metadata[0].name,
     kubernetes_namespace_v1.gitea_namespace.metadata[0].name,
-    kubernetes_namespace_v1.argocd_namespace.metadata[0].name
+    kubernetes_namespace_v1.argocd_namespace.metadata[0].name,
+    kubernetes_namespace_v1.todo_namespace.metadata[0].name,
+    kubernetes_namespace_v1.drone_namespace.metadata[0].name
   ]
 }
 
@@ -200,6 +357,20 @@ output "helm_releases" {
   value = [
     helm_release.cnpg_operator.name,
     helm_release.keycloak.name,
-    helm_release.gitea.name
+    helm_release.gitea.name,
+    helm_release.todo_app.name,
+    helm_release.argocd.name,
+    helm_release.drone.name,
+    helm_release.drone_runner.name
   ]
+}
+
+output "application_urls" {
+  value = {
+    keycloak = "https://keycloak.local"
+    gitea    = "https://gitea.local"
+    todo_app = "https://todo.local"
+    argocd   = "https://argocd.local"
+    drone    = "https://drone.local"
+  }
 }

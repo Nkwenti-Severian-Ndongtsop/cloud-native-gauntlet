@@ -1,7 +1,7 @@
 # Keycloak configuration
 keycloak:
   image:
-    repository: localhost:5000/keycloak/keycloak
+    repository: 192.168.56.10:5000/keycloak/keycloak
     tag: 26.3.3
     pullPolicy: IfNotPresent
   
@@ -45,13 +45,13 @@ cnpg:
     name: keycloak-db
     namespace: keycloak
     instances: 1
-    imageName: "localhost:5000/cloudnative-pg/postgresql:14"
+    imageName: "192.168.56.10:5000/cloudnative-pg/postgresql:14"
     storage:
       size: "512Mi"
-      storageClass: ""
+      storageClass: "local-path"  # Use local-path for K3s compatibility
     walStorage:
       size: "512Mi"
-      storageClass: ""
+      storageClass: "local-path"  # Use local-path for K3s compatibility
     resources:
       requests:
         cpu: "250m"

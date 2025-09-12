@@ -1,3 +1,7 @@
+{{- if .Values.gitea.persistence.enabled }}
+{{- $pvcName := printf "%s-data" .Release.Name }}
+{{- $existingPvc := lookup "v1" "PersistentVolumeClaim" .Release.Namespace $pvcName }}
+{{- if not $existingPvc }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -9,6 +13,15 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  {{- if .Values.gitea.persistence.storageClass }}
+  {{- if (eq "-" .Values.gitea.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.gitea.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
   resources:
     requests:
       storage: {{ .Values.gitea.persistence.size }}
+{{- end }}
+{{- end }}

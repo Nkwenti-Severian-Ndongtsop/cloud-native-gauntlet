@@ -29,6 +29,26 @@ resource "null_resource" "setup_kubeconfig" {
       # Create .kube directory if it doesn't exist
       mkdir -p ${path.module}/.kube
       
+      # Check VM status and start if needed
+      echo "Checking VM status..."
+      VM_STATUS=$(vagrant status --machine-readable | grep "state," | cut -d',' -f4)
+      echo "VM status: $VM_STATUS"
+      
+      if [ "$VM_STATUS" != "running" ]; then
+        echo "VM is not running (status: $VM_STATUS). Starting VM..."
+        if ! vagrant up; then
+          echo "Failed to start VM"
+          exit 1
+        fi
+        echo "VM started successfully"
+        
+        # Wait a bit for K3s to be ready
+        echo "Waiting for K3s to be ready..."
+        sleep 30
+      else
+        echo "VM is already running"
+      fi
+      
       # Get kubeconfig from VM and update the server IP
       echo "Fetching kubeconfig from VM..."
       if ! vagrant ssh -c "sudo cat /etc/rancher/k3s/k3s.yaml" > ${path.module}/.kube/k3s-config 2>/dev/null; then

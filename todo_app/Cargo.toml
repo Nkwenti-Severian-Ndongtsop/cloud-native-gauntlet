@@ -4,15 +4,15 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Core web and async dependencies
-tokio = { version = "1", features = ["full"] }
+# Core web and async dependencies (only needed features)
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time"] }
 axum = "0.7"
 
 # Serialization and JSON handling
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Database via SQLx, with rustls and migrate features enabled
+# Database via SQLx (only needed features)
 sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio-rustls", "postgres", "macros", "uuid", "time", "migrate"] }
 
 # Environment variables
@@ -28,5 +28,8 @@ time = { version = "0.3", features = ["serde", "macros"] }
 # For making HTTP requests to Keycloak's OIDC endpoints, using rustls
 reqwest = { version = "0.11", default-features = false, features = ["json", "rustls-tls"] }
 
-# For extracting typed headers like `Authorization: Bearer`
-axum-extra = { version = "0.9", features = ["typed-header"] }
+
+
+# For CORS support
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors"] }

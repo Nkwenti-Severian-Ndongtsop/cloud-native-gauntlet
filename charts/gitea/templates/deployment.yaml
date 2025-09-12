@@ -62,5 +62,16 @@ spec:
               value: "true"
             - name: GITEA__service__DISABLE_REGISTRATION
               value: "false"
+          volumeMounts:
+            {{- if .Values.gitea.persistence.enabled }}
+            - name: gitea-data
+              mountPath: /data
+            {{- end }}
           resources:
             {{- toYaml .Values.gitea.resources | nindent 12 }}
+      {{- if .Values.gitea.persistence.enabled }}
+      volumes:
+        - name: gitea-data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data
+      {{- end }}

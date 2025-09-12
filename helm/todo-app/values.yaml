@@ -1,0 +1,91 @@
+# Todo App Configuration
+todoApp:
+  image:
+    repository: 192.168.56.10:5000/todo-app
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  
+  ingress:
+    enabled: true
+    className: "traefik"
+    annotations: {}
+    hosts:
+      - host: todo.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+  
+  # Database configuration
+  database:
+    type: postgres
+    host: todo-db-rw.todo.svc.cluster.local
+    port: 5432
+    name: todo
+    user: postgres
+    existingSecret: todo-db-credentials
+  
+  # Environment variables
+  env:
+    - name: DATABASE_URL
+      value: "postgresql://postgres:$(DB_PASSWORD)@todo-db-rw.todo.svc.cluster.local:5432/todo"
+    - name: RUST_LOG
+      value: "info"
+    - name: SERVER_HOST
+      value: "0.0.0.0"
+    - name: SERVER_PORT
+      value: "8080"
+
+# PostgreSQL CNPG Configuration
+postgresql:
+  enabled: true
+  cluster:
+    name: todo-db
+    instances: 1
+    
+    # Bootstrap configuration
+    bootstrap:
+      initdb:
+        database: todo
+        owner: postgres
+        secret:
+          name: todo-db-credentials
+    
+    # Storage configuration
+    storage:
+      size: 512Mi
+      storageClass: "local-path"
+    
+    # Resources
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+    # Monitoring and backup
+    monitoring:
+      enabled: false
+    
+    # Enable superuser access for easier management
+    enableSuperuserAccess: true
+
+# Credentials for PostgreSQL
+credentials:
+  username: postgres
+  password: "todo123"

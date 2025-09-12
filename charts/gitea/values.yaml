@@ -1,7 +1,7 @@
 # Gitea configuration
 gitea:
   image:
-    repository: localhost:5000/gitea/gitea
+    repository: 192.168.56.10:5000/gitea/gitea
     tag: 1.20.5
     pullPolicy: IfNotPresent
   
@@ -40,7 +40,10 @@ gitea:
   persistence:
     enabled: true
     size: 8Gi
-    storageClass: ""
+    # Storage class for PVC - leave empty to use cluster default
+    # Set to "-" to disable dynamic provisioning
+    # Set to specific class name for that storage class
+    storageClass: "local-path"  # Use local-path for K3s compatibility
     accessMode: ReadWriteOnce
 
   # Resource configuration
@@ -59,13 +62,13 @@ postgresql:
     name: gitea-db
     namespace: gitea
     instances: 1
-    imageName: "localhost:5000/cloudnative-pg/postgresql:14"
+    imageName: "192.168.56.10:5000/cloudnative-pg/postgresql:14"
     storage:
       size: "512Mi"
-      storageClass: ""
+      storageClass: "local-path"  # Use local-path for K3s compatibility
     walStorage:
       size: "512Mi"
-      storageClass: ""
+      storageClass: "local-path"  # Use local-path for K3s compatibility
     resources:
       requests:
         cpu: "250m"

@@ -1,83 +1,195 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Hard-coded settings per request
+# ============================================================================
+# Keycloak Automation Script
+# ============================================================================
+# This script automates the setup of Keycloak realm, client, and test user
+# for the Todo application using the Keycloak Admin CLI (kcadm).
+#
+# Prerequisites:
+# - Keycloak must be deployed and running in Kubernetes (via Helm chart)
+# - kubectl access to the cluster (via vagrant ssh in this setup)
+# - Keycloak admin credentials
+#
+# Usage: ./setup-keycloak.sh
+#
+# Environment Variables (optional overrides):
+# - KEYCLOAK_NAMESPACE: Kubernetes namespace (default: keycloak)
+# - KEYCLOAK_URL: External Keycloak URL (default: http://keycloak.local)
+# - VM_NAME: Vagrant VM name (default: cloud-gauntlet)
+# - KEYCLOAK_ADMIN_USER: Admin username (default: admin)
+# - KEYCLOAK_ADMIN_PASSWORD: Admin password (default: admin)
+#
+# Examples:
+# # Default usage
+# ./setup-keycloak.sh
+#
+# # Custom namespace and VM
+# KEYCLOAK_NAMESPACE=auth-system VM_NAME=k8s-master ./setup-keycloak.sh
+#
+# # Different admin credentials
+# KEYCLOAK_ADMIN_USER=myadmin KEYCLOAK_ADMIN_PASSWORD=mypass ./setup-keycloak.sh
+# ============================================================================
+
+echo "🚀 Starting Keycloak automation setup..."
+
+# Configuration from environment variables
+# Note: These are now mandatory and must be set before running the script.
+# Example: export TODO_CLIENT_SECRET="your_secret"
+# Example: export TODO_TEST_PASSWORD="your_password"
 REALM_NAME="todo-app"
 CLIENT_ID="todo-app"
-CLIENT_SECRET="upEi5EJf36okjxogLG6RXWSZVmrRvd3E"
-REDIRECT_URI="http://todo.local/*"
-WEB_ORIGINS="*"
+CLIENT_SECRET="AR10DzMjGrWK8lzE8xSdzxEWe84HxRFh"
+# Note: No redirect URI needed - Todo app uses Direct Access Grant (password flow)
 TEST_USER="nkwenti"
 TEST_PASS="password"
 
-NS_KC="keycloak-system"
-NS_APP="todo-app"
+# Keycloak deployment settings (can be overridden via environment)
+NS_KC="${KEYCLOAK_NAMESPACE:-keycloak}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://keycloak.local}"
+VM_NAME="${VM_NAME:-cloud-gauntlet}"
 
-# Admin credentials (master realm)
-ADMIN_USER="nkwenti"
-ADMIN_PASS="password"
+# Admin credentials (can be overridden via environment)
+ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
+ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
 
-# Find Keycloak pod
-KC_POD=$(vagrant ssh k3s-master -c "kubectl get pods -n $NS_KC -l app=keycloak -o jsonpath='{.items[0].metadata.name}'" 2>/dev/null | tr -d '\r')
-if [[ -z "$KC_POD" ]]; then
-  echo "Keycloak pod not found in namespace $NS_KC" >&2
-  exit 1
-fi
+# ============================================================================
+# Helper Functions
+# ============================================================================
 
-# Use a shared config file inside the container so auth persists
-KCADM_CONFIG="/tmp/kcadm.config"
-
-# Helper to run kcadm with server+config specified
-a_kc() {
-  vagrant ssh k3s-master -c "kubectl -n $NS_KC exec $KC_POD -- /opt/keycloak/bin/kcadm.sh --server http://localhost:8080 --config $KCADM_CONFIG $*"
+# Function to execute kcadm commands in the Keycloak pod
+kcadm() {
+    vagrant ssh "$VM_NAME" -c "kubectl exec -n $NS_KC deployment/keycloak -- /opt/keycloak/bin/kcadm.sh $*"
 }
 
-echo "Waiting for Keycloak to be ready..."
-vagrant ssh k3s-master -c "kubectl -n $NS_KC wait --for=condition=ready --timeout=300s pod/$KC_POD" >/dev/null
+# ============================================================================
+# Main Setup Process
+# ============================================================================
 
-echo "Logging into Keycloak admin (master realm) as $ADMIN_USER..."
-if ! a_kc "config credentials --realm master --user $ADMIN_USER --password $ADMIN_PASS" >/dev/null 2>&1; then
-  echo "Warning: initial login attempt returned non-zero; continuing and will verify with a GET..."
-fi
-# Verify login by querying serverinfo
-if ! a_kc "get serverinfo --realm master" >/dev/null 2>&1; then
-  echo "Error: Unable to contact Keycloak with provided admin credentials." >&2
-  exit 1
-fi
+echo "🔍 Finding Keycloak pod in namespace $NS_KC..."
 
-echo "Ensuring realm $REALM_NAME exists..."
-if ! a_kc "get realms/$REALM_NAME" >/dev/null 2>&1; then
-  a_kc "create realms -s realm=$REALM_NAME -s enabled=true" >/dev/null
+# Check if Keycloak pod is running
+if ! vagrant ssh "$VM_NAME" -c "kubectl get pods -n $NS_KC -l app.kubernetes.io/name=keycloak" | grep -q Running; then
+    echo "❌ Keycloak pod not found or not running in namespace $NS_KC"
+    echo "💡 Make sure Keycloak is deployed and running"
+    exit 1
 fi
 
-echo "Ensuring client $CLIENT_ID exists..."
-if ! a_kc "get clients -r $REALM_NAME -q clientId=$CLIENT_ID" | grep -q '\"clientId\"'; then
-  a_kc "create clients -r $REALM_NAME -s clientId=$CLIENT_ID -s enabled=true -s publicClient=false -s directAccessGrantsEnabled=true -s 'redirectUris=[\"$REDIRECT_URI\"]' -s 'webOrigins=[\"$WEB_ORIGINS\"]'" >/dev/null
+echo "✅ Keycloak pod is running"
+
+echo "🔐 Authenticating with Keycloak admin using kcadm..."
+if ! kcadm config credentials --server http://localhost:8080 --realm master --user "$ADMIN_USER" --password "$ADMIN_PASS" >/dev/null 2>&1; then
+    echo "❌ Failed to authenticate with Keycloak admin"
+    echo "💡 Check admin credentials: $ADMIN_USER / $ADMIN_PASS"
+    exit 1
 fi
 
-CLIENT_UUID=$(a_kc "get clients -r $REALM_NAME -q clientId=$CLIENT_ID --fields id" | sed -n 's/.*\"id\" *: *\"\([^\"]*\)\".*/\1/p' | tr -d '\r')
-if [[ -z "$CLIENT_UUID" ]]; then
-  echo "Failed to resolve client UUID" >&2
-  exit 1
+echo "✅ Successfully authenticated as admin"
+
+# ============================================================================
+# 1. Create Realm
+# ============================================================================
+
+echo "🏰 Setting up realm: $REALM_NAME..."
+
+# Check if realm exists
+if kcadm get realms/$REALM_NAME >/dev/null 2>&1; then
+    echo "✅ Realm '$REALM_NAME' already exists"
+else
+    echo "📝 Creating realm '$REALM_NAME'..."
+    kcadm create realms \
+        -s realm="$REALM_NAME" \
+        -s enabled=true \
+        -s registrationAllowed=true \
+        -s registrationEmailAsUsername=false \
+        -s rememberMe=false \
+        -s verifyEmail=false \
+        -s loginWithEmailAllowed=false \
+        -s duplicateEmailsAllowed=false \
+        -s resetPasswordAllowed=false \
+        -s editUsernameAllowed=false \
+        -s bruteForceProtected=true
+    echo "✅ Realm '$REALM_NAME' created successfully"
 fi
 
-echo "Setting client secret..."
-a_kc "update clients/$CLIENT_UUID -r $REALM_NAME -s secret=$CLIENT_SECRET" >/dev/null
+# ============================================================================
+# 2. Create Client
+# ============================================================================
 
-echo "Ensuring test user $TEST_USER exists..."
-if ! a_kc "get users -r $REALM_NAME -q username=$TEST_USER" | grep -q "$TEST_USER"; then
-  a_kc "create users -r $REALM_NAME -s username=$TEST_USER -s enabled=true -s emailVerified=true -s email=$TEST_USER@example.com" >/dev/null
+echo "🔧 Setting up client: $CLIENT_ID..."
+
+# Check if client exists
+if kcadm get clients -r "$REALM_NAME" --query clientId="$CLIENT_ID" | grep -q "clientId"; then
+    echo "✅ Client '$CLIENT_ID' already exists"
+else
+    echo "📝 Creating client '$CLIENT_ID' for Direct Access Grant (password flow)..."
+    kcadm create clients -r "$REALM_NAME" \
+        -s clientId="$CLIENT_ID" \
+        -s enabled=true \
+        -s publicClient=false \
+        -s standardFlowEnabled=false \
+        -s directAccessGrantsEnabled=true \
+        -s secret="$CLIENT_SECRET"
+    echo "✅ Client '$CLIENT_ID' created successfully"
 fi
-USER_ID=$(a_kc "get users -r $REALM_NAME -q username=$TEST_USER --fields id" | sed -n 's/.*\"id\" *: *\"\([^\"]*\)\".*/\1/p' | tr -d '\r')
-if [[ -n "$USER_ID" ]]; then
-  a_kc "set-password -r $REALM_NAME --userid $USER_ID --new-password $TEST_PASS" >/dev/null
-  a_kc "update users/$USER_ID -r $REALM_NAME -s emailVerified=true -s enabled=true -s firstName=Test -s lastName=User" >/dev/null
+
+# ============================================================================
+# 3. Create Test User
+# ============================================================================
+
+echo "👤 Setting up test user: $TEST_USER..."
+
+# Check if user exists
+if kcadm get users -r "$REALM_NAME" --query username="$TEST_USER" | grep -q "username"; then
+    echo "✅ User '$TEST_USER' already exists"
+else
+    echo "📝 Creating user '$TEST_USER'..."
+    kcadm create users -r "$REALM_NAME" \
+        -s username="$TEST_USER" \
+        -s enabled=true \
+        -s emailVerified=true \
+        -s firstName="Nkwenti" \
+        -s lastName="Severian" \
+        -s email="$TEST_USER@example.com"
+
+    # Set password for the user
+    kcadm set-password -r "$REALM_NAME" --username "$TEST_USER" --new-password "$TEST_PASS"
+    echo "✅ User '$TEST_USER' created successfully"
 fi
 
-echo "Updating application deployment envs..."
-ISSUER_URL="http://keycloak.keycloak-system.svc.cluster.local/realms/$REALM_NAME"
-JWKS_URL="$ISSUER_URL/protocol/openid-connect/certs"
-vagrant ssh k3s-master -c "kubectl set env deployment/todo-app -n $NS_APP KEYCLOAK_REALM=$REALM_NAME KEYCLOAK_CLIENT_ID=$CLIENT_ID KEYCLOAK_CLIENT_SECRET=$CLIENT_SECRET KEYCLOAK_ISSUER_URL=$ISSUER_URL KEYCLOAK_JWKS_URL=$JWKS_URL" >/dev/null
-vagrant ssh k3s-master -c "kubectl rollout restart deployment/todo-app -n $NS_APP" >/dev/null
+# ============================================================================
+# 4. Final Configuration Summary
+# ============================================================================
 
-echo "Keycloak setup complete for realm=$REALM_NAME, client=$CLIENT_ID. App updated and restarted."
+echo ""
+echo "🎉 Keycloak setup completed successfully!"
+echo ""
+echo "📋 Configuration Summary:"
+echo "=========================="
+echo "Realm:           $REALM_NAME"
+echo "Client ID:       $CLIENT_ID"
+echo "Client Secret:   [Hidden for security]"
+echo "Grant Type:      Direct Access Grant (password flow)"
+echo "Test User:       $TEST_USER"
+echo "Test Password:   [Hidden for security]"
+echo ""
+echo "🔗 Keycloak URLs:"
+echo "Admin Console:   $KEYCLOAK_URL/admin/"
+echo "Realm Console:   $KEYCLOAK_URL/admin/master/console/#/realms/$REALM_NAME"
+echo "Auth Endpoint:   $KEYCLOAK_URL/realms/$REALM_NAME/protocol/openid-connect/auth"
+echo "Token Endpoint:  $KEYCLOAK_URL/realms/$REALM_NAME/protocol/openid-connect/token"
+echo "JWKS Endpoint:   $KEYCLOAK_URL/realms/$REALM_NAME/protocol/openid-connect/certs"
+echo ""
+echo "✅ Features Enabled:"
+echo "- User Registration: ✓"
+echo "- Direct Access Grants (Password): ✓"
+echo "- Client Authentication: ✓"
+echo "--------------------------"
+echo "❌ Features Disabled:"
+echo "- Standard Flow (Authorization Code): ✗ (not needed for API)"
+echo "- Remember Me: ✗"
+echo "- Password Reset: ✗"
+echo "- Login with Email: ✗"
+echo ""
+echo "🚀 Your Todo app is now ready to integrate with Keycloak!"
