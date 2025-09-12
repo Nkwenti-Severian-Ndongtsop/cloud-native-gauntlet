@@ -323,11 +323,9 @@ async fn get_keycloak_admin_token(state: &AppState) -> Result<String, Box<dyn st
         state.keycloak_url
     );
 
-    // Get Keycloak admin credentials from environment variables
-    let admin_username =
-        std::env::var("KEYCLOAK_ADMIN_USERNAME").expect("KEYCLOAK_ADMIN_USERNAME must be set");
-    let admin_password =
-        std::env::var("KEYCLOAK_ADMIN_PASSWORD").expect("KEYCLOAK_ADMIN_PASSWORD must be set");
+    // Use hardcoded Keycloak admin credentials (matching setup script)
+    let admin_username = "admin";
+    let admin_password = "admin";
 
     let mut form_data = HashMap::new();
     form_data.insert("grant_type", "password");
