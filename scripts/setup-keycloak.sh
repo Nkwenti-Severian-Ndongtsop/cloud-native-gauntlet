@@ -9,50 +9,27 @@ set -euo pipefail
 #
 # Prerequisites:
 # - Keycloak must be deployed and running in Kubernetes (via Helm chart)
-# - kubectl access to the cluster (via vagrant ssh in this setup)
+# - kubectl access to the cluster (via vagrant ssh)
 # - Keycloak admin credentials
 #
 # Usage: ./setup-keycloak.sh
-#
-# Environment Variables (optional overrides):
-# - KEYCLOAK_NAMESPACE: Kubernetes namespace (default: keycloak)
-# - KEYCLOAK_URL: External Keycloak URL (default: http://keycloak.local)
-# - VM_NAME: Vagrant VM name (default: cloud-gauntlet)
-# - KEYCLOAK_ADMIN_USER: Admin username (default: admin)
-# - KEYCLOAK_ADMIN_PASSWORD: Admin password (default: admin)
-#
-# Examples:
-# # Default usage
-# ./setup-keycloak.sh
-#
-# # Custom namespace and VM
-# KEYCLOAK_NAMESPACE=auth-system VM_NAME=k8s-master ./setup-keycloak.sh
-#
-# # Different admin credentials
-# KEYCLOAK_ADMIN_USER=myadmin KEYCLOAK_ADMIN_PASSWORD=mypass ./setup-keycloak.sh
 # ============================================================================
 
 echo "🚀 Starting Keycloak automation setup..."
 
-# Configuration from environment variables
-# Note: These are now mandatory and must be set before running the script.
-# Example: export TODO_CLIENT_SECRET="your_secret"
-# Example: export TODO_TEST_PASSWORD="your_password"
+# Configuration
 REALM_NAME="todo-app"
 CLIENT_ID="todo-app"
 CLIENT_SECRET="AR10DzMjGrWK8lzE8xSdzxEWe84HxRFh"
-# Note: No redirect URI needed - Todo app uses Direct Access Grant (password flow)
 TEST_USER="nkwenti"
 TEST_PASS="password"
 
-# Keycloak deployment settings (can be overridden via environment)
-NS_KC="${KEYCLOAK_NAMESPACE:-keycloak}"
-KEYCLOAK_URL="${KEYCLOAK_URL:-http://keycloak.local}"
-VM_NAME="${VM_NAME:-cloud-gauntlet}"
-
-# Admin credentials (can be overridden via environment)
-ADMIN_USER="${KEYCLOAK_ADMIN_USER:-admin}"
-ADMIN_PASS="${KEYCLOAK_ADMIN_PASSWORD:-admin}"
+# Deployment settings
+NS_KC="keycloak"
+KEYCLOAK_URL="http://keycloak.local"
+VM_NAME="cloud-gauntlet"
+ADMIN_USER="admin"
+ADMIN_PASS="admin"
 
 # ============================================================================
 # Helper Functions

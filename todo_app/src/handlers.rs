@@ -5,10 +5,6 @@ use axum::{
     response::IntoResponse,
     Json,
 };
-use axum_extra::{
-    headers::{authorization::Bearer, Authorization},
-    TypedHeader,
-};
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
@@ -47,19 +43,30 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         parts: &mut Parts,
         state: &AppState,
     ) -> Result<Self, Self::Rejection> {
-        // Get the Authorization header containing the Bearer token using the extractor.
-        let TypedHeader(Authorization(bearer)) =
-            TypedHeader::<Authorization<Bearer>>::from_request_parts(parts, state)
-                .await
-                .map_err(|_| {
-                    (
-                        StatusCode::UNAUTHORIZED,
-                        "Missing or invalid Authorization header",
-                    )
-                })?;
+        // Get the Authorization header manually
+        let auth_header = parts
+            .headers
+            .get("authorization")
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                "Missing Authorization header",
+            ))?
+            .to_str()
+            .map_err(|_| (
+                StatusCode::UNAUTHORIZED,
+                "Invalid Authorization header format",
+            ))?;
+
+        // Extract Bearer token
+        let token = auth_header
+            .strip_prefix("Bearer ")
+            .ok_or((
+                StatusCode::UNAUTHORIZED,
+                "Authorization header must start with 'Bearer '",
+            ))?;
 
         // Find the specific key that was used to sign this token from cached JWKS.
-        let header = decode_header(bearer.token())
+        let header = decode_header(token)
             .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid token header"))?;
         let kid = header.kid.ok_or((
             StatusCode::BAD_REQUEST,
@@ -73,7 +80,7 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
         let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.validate_aud = false; // For this simple case, we'll skip audience validation.
 
-        let token_data = decode::<Claims>(bearer.token(), decoding_key, &validation)
+        let token_data = decode::<Claims>(token, decoding_key, &validation)
             .map_err(|_| (StatusCode::UNAUTHORIZED, "Token validation failed"))?;
 
         // Extract the user ID from the 'sub' claim (Keycloak user ID)
