@@ -8,7 +8,6 @@ use axum::{
 use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 
-// --- THESE `use` STATEMENTS ARE NOW CORRECTED ---
 use crate::db;
 use crate::models::{
     AuthResponse, CreateTask, ErrorResponse, KeycloakCredential, KeycloakUser, LoginRequest,
@@ -16,25 +15,16 @@ use crate::models::{
 };
 use crate::AppState;
 use std::collections::HashMap;
-// --------------------------------------------
 
-// This struct represents the claims we expect in our JWT.
-// The `sub` (subject) field is the user's ID from Keycloak.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,
 }
 
-// This struct will hold the authenticated user's ID after successful validation.
 pub struct AuthenticatedUser {
-    pub id: String, // User ID from JWT 'sub' claim (Keycloak user ID)
+    pub id: String,
 }
 
-// JWKS are fetched and cached at startup; no structs needed here.
-
-// This is an Axum Extractor. It runs before our handlers.
-// It will check for a valid JWT and provide the user ID if successful.
-// If validation fails, it automatically returns a 401 Unauthorized error.
 #[async_trait]
 impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = (StatusCode, &'static str);
@@ -118,11 +108,9 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
     }
 }
 
-// The handlers are now much cleaner and more secure. They just take AuthenticatedUser as a parameter.
-// If the token is invalid, this code will never even be reached.
 pub async fn create_task_handler(
     State(state): State<AppState>,
-    user: AuthenticatedUser, // The extractor provides the authenticated user's ID from JWT
+    user: AuthenticatedUser,
     Json(new_task): Json<CreateTask>,
 ) -> impl IntoResponse {
     match db::create_task(&state.db_pool, user.id, new_task).await {
@@ -136,7 +124,7 @@ pub async fn create_task_handler(
 
 pub async fn get_tasks_handler(
     State(state): State<AppState>,
-    user: AuthenticatedUser, // Get tasks for this specific user only
+    user: AuthenticatedUser,
 ) -> impl IntoResponse {
     // Get tasks for the specific user (extracted from JWT)
     match db::get_tasks_for_user(&state.db_pool, user.id).await {

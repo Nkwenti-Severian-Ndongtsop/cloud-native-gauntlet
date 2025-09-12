@@ -7,7 +7,7 @@ use uuid::Uuid;
 pub struct Task {
     #[serde(default = "Uuid::new_v4")]
     pub id: Uuid,
-    pub user_id: String, // Keycloak user ID (string)
+    pub user_id: String,
     pub title: String,
     pub is_completed: bool,
     #[serde(with = "time::serde::rfc3339")]

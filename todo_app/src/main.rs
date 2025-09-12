@@ -1,4 +1,3 @@
-// Declare our new modules
 mod db;
 mod handlers;
 mod models;
@@ -14,8 +13,6 @@ use std::{env, net::SocketAddr};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
-// --- THIS STRUCT IS NOW PUBLIC ---
-// This allows other modules in our crate to use it.
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: PgPool,
@@ -23,7 +20,6 @@ pub struct AppState {
     pub keycloak_realm: String,
     pub jwks_url: String,
 }
-// ---------------------------------
 
 #[tokio::main]
 async fn main() {
