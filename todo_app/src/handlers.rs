@@ -65,22 +65,50 @@ impl FromRequestParts<AppState> for AuthenticatedUser {
                 "Authorization header must start with 'Bearer '",
             ))?;
 
-        // Find the specific key that was used to sign this token from cached JWKS.
+        // Fetch JWKS dynamically from Keycloak on each request
         let header = decode_header(token)
             .map_err(|_| (StatusCode::BAD_REQUEST, "Invalid token header"))?;
         let kid = header.kid.ok_or((
             StatusCode::BAD_REQUEST,
             "Token missing 'kid' (Key ID) in header",
         ))?;
-        let decoding_key: &DecodingKey = state.jwks.get(&kid).ok_or((
+
+        // Fetch JWKS from Keycloak
+        let jwks: serde_json::Value = reqwest::get(&state.jwks_url)
+            .await
+            .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Failed to fetch JWKS from Keycloak"))?
+            .json()
+            .await
+            .map_err(|_| (StatusCode::SERVICE_UNAVAILABLE, "Failed to parse JWKS response"))?;
+
+        // Find the specific key that was used to sign this token
+        let mut decoding_key: Option<DecodingKey> = None;
+        if let Some(keys) = jwks.get("keys").and_then(|k| k.as_array()) {
+            for k in keys {
+                if let (Some(key_kid), Some(n), Some(e)) = (
+                    k.get("kid").and_then(|v| v.as_str()),
+                    k.get("n").and_then(|v| v.as_str()),
+                    k.get("e").and_then(|v| v.as_str()),
+                ) {
+                    if key_kid == kid {
+                        if let Ok(dec_key) = DecodingKey::from_rsa_components(n, e) {
+                            decoding_key = Some(dec_key);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let decoding_key = decoding_key.ok_or((
             StatusCode::UNAUTHORIZED,
-            "Signing key not found in JWKS cache",
+            "Signing key not found in current JWKS",
         ))?;
 
         let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
         validation.validate_aud = false; // For this simple case, we'll skip audience validation.
 
-        let token_data = decode::<Claims>(token, decoding_key, &validation)
+        let token_data = decode::<Claims>(token, &decoding_key, &validation)
             .map_err(|_| (StatusCode::UNAUTHORIZED, "Token validation failed"))?;
 
         // Extract the user ID from the 'sub' claim (Keycloak user ID)

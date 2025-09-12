@@ -1,4 +1,7 @@
+-- Enable UUID extension for PostgreSQL
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
+-- Create tasks table with UUID primary key and text user_id for Keycloak integration
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id TEXT NOT NULL,  -- Keycloak user ID (string)

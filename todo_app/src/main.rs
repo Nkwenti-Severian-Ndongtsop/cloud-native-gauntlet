@@ -9,9 +9,8 @@ use axum::{
     Router,
 };
 use dotenvy::dotenv;
-use jsonwebtoken::DecodingKey;
 use sqlx::{postgres::PgPoolOptions, PgPool};
-use std::{collections::HashMap, env, net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr};
 use tower::ServiceBuilder;
 use tower_http::cors::{Any, CorsLayer};
 
@@ -22,7 +21,7 @@ pub struct AppState {
     pub db_pool: PgPool,
     pub keycloak_url: String,
     pub keycloak_realm: String,
-    pub jwks: Arc<HashMap<String, DecodingKey>>,
+    pub jwks_url: String,
 }
 // ---------------------------------
 
@@ -51,13 +50,13 @@ async fn main() {
         .expect("Failed to run database migrations.");
     println!("Database migrations ran successfully.");
 
-    // Fetch JWKS from Keycloak using standard OIDC discovery
+    // Get JWKS URL from Keycloak using standard OIDC discovery
     let oidc_config_url = format!(
         "{}/realms/{}/.well-known/openid-configuration",
         keycloak_url, keycloak_realm
     );
 
-    println!("Fetching OIDC configuration");
+    println!("Fetching OIDC configuration to get JWKS URL");
     let oidc_config: serde_json::Value = reqwest::get(&oidc_config_url)
         .await
         .expect("Failed to fetch OIDC configuration")
@@ -70,34 +69,6 @@ async fn main() {
         .expect("jwks_uri not found in OIDC configuration")
         .to_string();
 
-    println!("Fetching JWKS");
-    let jwks: serde_json::Value = reqwest::get(&jwks_url)
-        .await
-        .expect("Failed to fetch JWKS")
-        .json()
-        .await
-        .expect("Failed to parse JWKS JSON");
-
-    // Build a map of kid -> DecodingKey
-    let mut kid_to_key: HashMap<String, DecodingKey> = HashMap::new();
-    if let Some(keys) = jwks.get("keys").and_then(|k| k.as_array()) {
-        for k in keys {
-            if let (Some(kid), Some(n), Some(e)) = (
-                k.get("kid").and_then(|v| v.as_str()),
-                k.get("n").and_then(|v| v.as_str()),
-                k.get("e").and_then(|v| v.as_str()),
-            ) {
-                if let Ok(dec_key) = DecodingKey::from_rsa_components(n, e) {
-                    kid_to_key.insert(kid.to_string(), dec_key);
-                }
-            }
-        }
-    }
-    let jwks_arc = Arc::new(kid_to_key);
-
-    // Get health check path from environment
-    let health_check_path = env::var("HEALTH_CHECK_PATH").unwrap_or_else(|_| "/health".to_string());
-
     // Configure CORS to allow requests from Keycloak and local development
     let cors = CorsLayer::new()
         .allow_origin(keycloak_url.clone().parse::<HeaderValue>().unwrap())
@@ -109,7 +80,7 @@ async fn main() {
         db_pool: pool.clone(),
         keycloak_url: keycloak_url.clone(),
         keycloak_realm: keycloak_realm.clone(),
-        jwks: jwks_arc,
+        jwks_url,
     };
 
     // Build our application router with CORS and state
@@ -121,7 +92,7 @@ async fn main() {
         .route("/tasks", post(handlers::create_task_handler))
         .route("/tasks", get(handlers::get_tasks_handler))
         // Health check (configurable path)
-        .route(&health_check_path, get(|| async { "ok" }))
+        .route("/health", get(|| async { "Todo api is up and running" }))
         .with_state(app_state)
         .layer(ServiceBuilder::new().layer(cors));
 
