@@ -18,12 +18,9 @@ IMAGES=(
   "ghcr.io/dexidp/dex:v2.43.0"
   "public.ecr.aws/docker/library/redis:7.2.7-alpine"
 
-  #todo-api
+  # todo-api
   "ghcr.io/nkwenti-severian-ndongtsop/todo-api:latest"
 )
-
-# Create directories for offline packages
-mkdir -p offline-images
 
 # Pull and save images
 for image in "${IMAGES[@]}"; do

@@ -1,0 +1,28 @@
+{{- if .Values.gitea.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  {{- with .Values.gitea.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.gitea.ingress.ingressClassName }}
+  ingressClassName: {{ .Values.gitea.ingress.ingressClassName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.gitea.ingress.hostname }}
+      http:
+        paths:
+          - path: {{ .Values.gitea.ingress.path }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}
+                port:
+                  name: http
+{{- end }}

@@ -1,0 +1,21 @@
+Gitea has been deployed successfully!
+
+Database Configuration:
+  Host: {{ .Values.gitea.database.host }}
+  Port: {{ .Values.gitea.database.port }}
+  Database: {{ .Values.gitea.database.name }}
+  Username: {{ .Values.gitea.database.user }}
+  Password: Stored in secret/{{ .Values.gitea.database.existingSecret }}
+
+Access Gitea UI at: {{ .Values.gitea.ingress.hostname }}
+
+First-time setup:
+  1. Go to {{ .Values.gitea.ingress.hostname }}
+  2. Complete the installation form with your admin user details
+  3. Configure the database connection if needed
+
+To access Gitea via SSH:
+  git clone ssh://git@{{ .Values.gitea.ingress.hostname }}:22/username/repo.git
+
+To access Gitea via HTTP/HTTPS:
+  git clone https://{{ .Values.gitea.ingress.hostname }}/username/repo.git

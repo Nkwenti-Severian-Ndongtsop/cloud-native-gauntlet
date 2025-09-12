@@ -1,0 +1,22 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keycloak
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"  # Deploy after CNPG operator
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/yourusername/cloud-native-gauntlet.git
+    targetRevision: HEAD
+    path: charts/keycloak
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keycloak
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

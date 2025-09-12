@@ -1,5 +1,4 @@
 .vagrant
-README.md
 target
 .env
 .terraform*

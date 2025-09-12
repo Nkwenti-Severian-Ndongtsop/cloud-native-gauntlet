@@ -1,0 +1,40 @@
+# Todo App Configuration
+image:
+  repository: localhost:5000/todo-app
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: traefik
+  hostname: todo.local
+  path: /
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# PostgreSQL configuration (using Bitnami chart)
+postgresql:
+  enabled: true
+  auth:
+    database: todo
+    username: todo
+    password: "todo-password"
+  primary:
+    persistence:
+      size: 1Gi
+  image:
+    registry: localhost:5000
+    repository: bitnami/postgresql
+    tag: 14

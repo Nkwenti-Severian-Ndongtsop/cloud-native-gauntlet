@@ -1,0 +1,14 @@
+apiVersion: v2
+name: keycloak
+description: A Helm chart for Keycloak with CNPG integration
+type: application
+version: 1.0.11
+appVersion: 26.3.3
+keywords:
+  - keycloak
+  - identity
+  - authentication
+  - authorization
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion }}
+    spec:
+      containers:
+        - name: {{ .Release.Name }}
+          image: "{{ .Values.gitea.image.repository }}:{{ .Values.gitea.image.tag }}"
+          imagePullPolicy: {{ .Values.gitea.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.gitea.server.HTTP_PORT }}
+              protocol: TCP
+            - name: ssh
+              containerPort: 22
+              protocol: TCP
+          env:
+            - name: GITEA__database__DB_TYPE
+              value: {{ .Values.gitea.database.type | quote }}
+            - name: GITEA__database__HOST
+              value: {{ .Values.gitea.database.host | quote }}
+            - name: GITEA__database__NAME
+              value: {{ .Values.gitea.database.name | quote }}
+            - name: GITEA__database__USER
+              value: {{ .Values.gitea.database.user | quote }}
+            - name: GITEA__database__PASSWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gitea.database.existingSecret }}
+                  key: password
+            - name: GITEA__database__SCHEMA
+              value: ""
+            - name: GITEA__server__DOMAIN
+              value: {{ .Values.gitea.server.DOMAIN | quote }}
+            - name: GITEA__server__SSH_DOMAIN
+              value: {{ .Values.gitea.server.DOMAIN | quote }}
+            - name: GITEA__server__ROOT_URL
+              value: {{ .Values.gitea.server.ROOT_URL | quote }}
+            - name: GITEA__server__PROTOCOL
+              value: {{ .Values.gitea.server.PROTOCOL | quote }}
+            - name: GITEA__server__HTTP_PORT
+              value: {{ .Values.gitea.server.HTTP_PORT | quote }}
+            - name: GITEA__security__INSTALL_LOCK
+              value: "true"
+            - name: GITEA__service__DISABLE_REGISTRATION
+              value: "false"
+          resources:
+            {{- toYaml .Values.gitea.resources | nindent 12 }}

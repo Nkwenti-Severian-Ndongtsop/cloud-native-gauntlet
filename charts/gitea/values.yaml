@@ -1,0 +1,75 @@
+# Gitea configuration
+gitea:
+  image:
+    repository: localhost:5000/gitea/gitea
+    tag: 1.20.5
+    pullPolicy: IfNotPresent
+  
+  # Enable built-in Ingress for K3s Traefik
+  ingress:
+    enabled: true
+    className: traefik
+    annotations: {}
+    hostname: gitea.local
+    path: /
+  
+  # Database configuration
+  database:
+    type: postgres
+    host: gitea-db-rw.gitea.svc.cluster.local
+    port: 5432
+    name: gitea
+    user: postgres
+    createDatabase: true
+    existingSecret: gitea-db-credentials
+  
+  # Admin user configuration
+  admin:
+    username: gitea_admin
+    password: gitea_admin_password
+    email: admin@example.com
+  
+  # Server configuration
+  server:
+    DOMAIN: gitea.local
+    ROOT_URL: https://gitea.local
+    HTTP_PORT: 3000
+    PROTOCOL: http
+  
+  # Persistence configuration
+  persistence:
+    enabled: true
+    size: 8Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+# PostgreSQL configuration (CNPG)
+postgresql:
+  enabled: true
+  cluster:
+    name: gitea-db
+    namespace: gitea
+    instances: 1
+    imageName: "localhost:5000/cloudnative-pg/postgresql:14"
+    storage:
+      size: "512Mi"
+      storageClass: ""
+    walStorage:
+      size: "512Mi"
+      storageClass: ""
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"

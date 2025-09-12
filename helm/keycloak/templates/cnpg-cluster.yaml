@@ -1,0 +1,75 @@
+{{- if .Values.cnpg.enabled }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Values.cnpg.cluster.name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "keycloak.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  instances: {{ .Values.cnpg.cluster.instances }}
+  
+  # Image configuration
+  imageName: {{ .Values.cnpg.cluster.image | default "ghcr.io/cloudnative-pg/postgresql:15.3" }}
+  
+  # Storage configuration
+  storage:
+    size: {{ .Values.cnpg.cluster.storage.size }}
+    storageClass: {{ .Values.cnpg.cluster.storage.storageClass | quote }}
+  
+  # WAL storage configuration
+  walStorage:
+    size: {{ .Values.cnpg.cluster.walStorage.size }}
+    storageClass: {{ .Values.cnpg.cluster.walStorage.storageClass | quote }}
+  
+  # Resource requirements
+  resources:
+    requests:
+      cpu: {{ .Values.cnpg.cluster.resources.requests.cpu }}
+      memory: {{ .Values.cnpg.cluster.resources.requests.memory }}
+    limits:
+      cpu: {{ .Values.cnpg.cluster.resources.limits.cpu }}
+      memory: {{ .Values.cnpg.cluster.resources.limits.memory }}
+  
+  # PostgreSQL configuration
+  postgresql:
+    parameters:
+      {{- toYaml .Values.cnpg.cluster.postgresql.parameters | nindent 6 }}
+  
+  # Backup configuration
+  backup:
+    barmanObjectStore:
+      destinationPath: {{ .Values.cnpg.cluster.backup.barmanObjectStore.destinationPath }}
+      endpointURL: {{ .Values.cnpg.cluster.backup.barmanObjectStore.endpointURL | quote }}
+    retentionPolicy: {{ .Values.cnpg.cluster.backup.retentionPolicy | quote }}
+  
+  # Bootstrap configuration
+  bootstrap:
+    initdb:
+      database: {{ .Values.cnpg.cluster.bootstrap.initdb.database }}
+      owner: {{ .Values.cnpg.cluster.bootstrap.initdb.owner }}
+      secret:
+        name: {{ .Values.cnpg.cluster.bootstrap.initdb.secret.name }}
+  
+  # Monitoring configuration
+  monitoring:
+    enablePodMonitor: {{ .Values.cnpg.cluster.monitor.enablePodMonitor }}
+  
+  # Affinity rules
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - {{ .Values.cnpg.cluster.name }}
+          topologyKey: "kubernetes.io/hostname"
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    maxUnavailable: {{ .Values.cnpg.cluster.podDisruptionBudget.maxUnavailable }}
+    minAvailable: {{ .Values.cnpg.cluster.podDisruptionBudget.minAvailable }}
+{{- end }}

@@ -1,0 +1,61 @@
+# Keycloak configuration
+keycloak:
+  image:
+    repository: localhost:5000/keycloak/keycloak
+    tag: 26.3.3
+    pullPolicy: IfNotPresent
+  
+  # Database configuration
+  db:
+    vendor: postgres
+    host: "keycloak-db-rw.keycloak.svc.cluster.local"
+    port: 5432
+    name: keycloak
+    username: postgres
+    existingSecret: keycloak-db-credentials
+  
+  # Admin user configuration
+  auth:
+    adminUser: admin
+    adminPassword: admin
+    managementUser: manager
+    managementPassword: manager
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  # Ingress configuration for K3s built-in Traefik
+  ingress:
+    enabled: true
+    annotations: {}
+    ingressClassName: traefik
+    hostname: keycloak.local
+    path: /
+
+# CNPG PostgreSQL cluster configuration
+cnpg:
+  enabled: true
+  cluster:
+    name: keycloak-db
+    namespace: keycloak
+    instances: 1
+    imageName: "localhost:5000/cloudnative-pg/postgresql:14"
+    storage:
+      size: "512Mi"
+      storageClass: ""
+    walStorage:
+      size: "512Mi"
+      storageClass: ""
+    resources:
+      requests:
+        cpu: "250m"
+        memory: "256Mi"
+      limits:
+        cpu: "500m"
+        memory: "512Mi"

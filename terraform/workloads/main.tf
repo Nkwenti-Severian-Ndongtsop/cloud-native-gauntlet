@@ -12,23 +12,32 @@ terraform {
       source  = "hashicorp/local"
       version = ">= 2.4.0"
     }
+    kubectl = {
+      source  = "gavinbunney/kubectl"
+      version = ">= 1.14.0"
+    }
   }
 }
 
+# Configure the kubectl provider
+provider "kubectl" {
+  config_path      = "${path.module}/../.kube/config"
+  config_context   = "default"
+  apply_retry_count = 5
+}
+
 provider "kubernetes" {
-  config_path = var.kubeconfig_path
+  config_path    = "${path.module}/../.kube/config"
+  config_context = "default"
 }
 
 provider "helm" {
   kubernetes = {
-    config_path = var.kubeconfig_path
+    config_path    = "${path.module}/../.kube/config"
+    config_context = "default"
   }
 }
 
-variable "kubeconfig_path" {
-  description = "Path to the kubeconfig file"
-  type        = string
-}
 
 # Create namespaces
 resource "kubernetes_namespace_v1" "cnpg_namespace" {
@@ -55,26 +64,103 @@ resource "kubernetes_namespace_v1" "argocd_namespace" {
   }
 }
 
-# Deploy CNPG Operator using Helm
+# Add CloudNativePG Helm repository
 resource "helm_release" "cnpg_operator" {
-  name       = "cnpg-operator"
-  chart      = "${path.module}/../../helm/cnpg-operator"
+  name       = "cnpg"
+  repository = "https://cloudnative-pg.github.io/charts"
+  chart      = "cloudnative-pg"
   namespace  = kubernetes_namespace_v1.cnpg_namespace.metadata[0].name
-  wait       = false
-  timeout    = 600
+  version    = "0.19.1"  # Use the latest stable version
+  wait       = true
+  timeout    = 1800
+  force_update = true
+  create_namespace = true
+
+  values = [
+    <<-EOT
+    image:
+      registry: localhost:5000
+      repository: cloudnative-pg/cloudnative-pg
+      tag: "1.20.0"
+      pullPolicy: IfNotPresent
+    EOT
+  ]
 
   depends_on = [kubernetes_namespace_v1.cnpg_namespace]
 }
 
-# Deploy Keycloak using local Helm chart
+# Deploy Keycloak using local Helm chart with CNPG configuration
 resource "helm_release" "keycloak" {
   name       = "keycloak"
-  chart      = "${path.module}/../../helm/keycloak"
+  chart      = "${path.module}/../../charts/keycloak"
   namespace  = kubernetes_namespace_v1.keycloak_namespace.metadata[0].name
-  wait       = false
-  timeout    = 900
+  wait       = true
+  timeout    = 1800
   force_update = true
   recreate_pods = true
+  
+  # Use values from the Helm chart
+  values = [
+    <<-EOT
+    keycloak:
+      image:
+        repository: "localhost:5000/keycloak/keycloak"
+        tag: "26.3.3"
+        pullPolicy: "IfNotPresent"
+      
+      # Database configuration
+      db:
+        vendor: postgres
+        host: "keycloak-db-rw.keycloak.svc.cluster.local"
+        port: 5432
+        name: keycloak
+        username: postgres
+        existingSecret: keycloak-db-credentials
+      
+      # Admin user configuration
+      auth:
+        adminUser: admin
+        adminPassword: admin
+        managementUser: manager
+        managementPassword: manager
+      
+      # Resource configuration
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "512Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+      
+      # Enable CNPG integration
+      cnpg:
+        enabled: true
+        cluster:
+          name: keycloak-db
+          namespace: keycloak
+          instances: 1
+          imageName: "localhost:5000/cloudnative-pg/postgresql:14"
+          storage:
+            size: "512Mi"
+            storageClass: ""
+          walStorage:
+            size: "512Mi"
+            storageClass: ""
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+    EOT
+  ]
+
+  # Add a delay to ensure the CNPG operator is fully ready
+  provisioner "local-exec" {
+    command = "sleep 30"
+  }
 
   depends_on = [
     kubernetes_namespace_v1.keycloak_namespace,
@@ -85,9 +171,9 @@ resource "helm_release" "keycloak" {
 # Deploy Gitea using local Helm chart
 resource "helm_release" "gitea" {
   name       = "gitea"
-  chart      = "${path.module}/../../helm/gitea"
+  chart      = "${path.module}/../../charts/gitea"
   namespace  = kubernetes_namespace_v1.gitea_namespace.metadata[0].name
-  wait       = false
+  wait       = true
   timeout    = 900
   force_update = true
   recreate_pods = true
@@ -99,32 +185,6 @@ resource "helm_release" "gitea" {
 }
 
 # Deploy ArgoCD using kubectl apply (since it's not a Helm chart)
-resource "null_resource" "argocd_install" {
-  depends_on = [kubernetes_namespace_v1.argocd_namespace]
-
-  provisioner "local-exec" {
-    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl apply -f helm/argocd/install.yaml'"
-  }
-
-  provisioner "local-exec" {
-    when = destroy
-    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl delete -f helm/argocd/install.yaml --ignore-not-found=true'"
-  }
-}
-
-# Deploy ArgoCD Application for infrastructure
-resource "null_resource" "argocd_infra_app" {
-  depends_on = [null_resource.argocd_install]
-
-  provisioner "local-exec" {
-    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl apply -f helm/argocd/infra-app.yaml'"
-  }
-
-  provisioner "local-exec" {
-    when = destroy
-    command = "vagrant ssh cloud-gauntlet -c 'cd /vagrant && kubectl delete -f helm/argocd/infra-app.yaml --ignore-not-found=true'"
-  }
-}
 
 # Output useful information
 output "namespaces" {

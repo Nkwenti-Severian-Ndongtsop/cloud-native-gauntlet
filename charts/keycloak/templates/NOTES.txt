@@ -1,0 +1,24 @@
+{{- if .Values.cnpg.enabled }}
+Keycloak has been deployed with a CloudNativePG managed PostgreSQL database.
+
+Database Configuration:
+  Host: {{ .Values.keycloak.db.host }}
+  Port: {{ .Values.keycloak.db.port }}
+  Database: {{ .Values.keycloak.db.name }}
+  Username: {{ .Values.keycloak.db.username }}
+  Password: Stored in secret/{{ .Values.keycloak.db.existingSecret }}
+{{- else }}
+Keycloak has been deployed with an external database.
+{{- end }}
+
+Admin Credentials:
+  Username: {{ .Values.keycloak.auth.adminUser }}
+  Password: Stored in secret/{{ .Release.Name }}-admin-credentials
+
+Access Keycloak UI at: {{ .Values.keycloak.ingress.hostname }}
+
+To get the admin password:
+  kubectl get secret {{ .Release.Name }}-admin-credentials -n {{ .Release.Namespace }} -o jsonpath="{.data.password}" | base64 --decode
+
+To access Keycloak:
+  kubectl port-forward svc/{{ .Release.Name }} -n {{ .Release.Namespace }} 8080:80

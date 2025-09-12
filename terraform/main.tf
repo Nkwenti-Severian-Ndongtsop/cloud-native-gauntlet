@@ -1,6 +1,3 @@
-# Configure the null provider as a placeholder for infrastructure definition
-# In a real-world scenario, this would be a cloud provider like AWS, Azure, GCP,
-# or a virtualization provider like VirtualBox or Libvirt.
 terraform {
   required_version = ">= 1.4.0"
 
@@ -13,13 +10,72 @@ terraform {
       source  = "hashicorp/local"
       version = ">= 2.4.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23.0"
+    }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.11.0"
+    }
   }
 }
 
-provider "null" {}
+# Get kubeconfig from the VM and set up providers
+resource "null_resource" "setup_kubeconfig" {
+  # This will run during the apply phase
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Create .kube directory if it doesn't exist
+      mkdir -p ${path.module}/.kube
+      
+      # Get kubeconfig from VM and update the server IP
+      echo "Fetching kubeconfig from VM..."
+      if ! vagrant ssh -c "sudo cat /etc/rancher/k3s/k3s.yaml" > ${path.module}/.kube/k3s-config 2>/dev/null; then
+        echo "Failed to fetch kubeconfig from VM"
+        exit 1
+      fi
+      
+      # Update the server IP in the kubeconfig
+      echo "Updating kubeconfig with VM IP..."
+      if ! sed 's/127.0.0.1/192.168.56.10/g' ${path.module}/.kube/k3s-config > ${path.module}/.kube/config; then
+        echo "Failed to update kubeconfig with VM IP"
+        exit 1
+      fi
+      
+      # Set proper permissions on the kubeconfig file
+      chmod 600 ${path.module}/.kube/config
+      
+      echo "Kubeconfig has been set up at ${path.module}/.kube/config"
+    EOT
+  }
 
-# Kubernetes provider; will use the kubeconfig file fetched from the VM
-# Intentionally no kubernetes/helm providers at root to avoid early provider init
+  # This ensures the resource is always recreated to get fresh kubeconfig
+  triggers = {
+    always_run = "${timestamp()}"
+  }
+}
+
+# Configure Kubernetes provider with dynamic kubeconfig
+provider "kubernetes" {
+  config_path    = "${path.module}/.kube/config"
+  config_context = "default"
+}
+
+provider "helm" {
+  kubernetes {
+    config_path    = "${path.module}/.kube/config"
+    config_context = "default"
+  }
+}
+
+# Create a local file with the VM's IP for /etc/hosts
+resource "local_file" "hosts_file" {
+  filename = "${path.module}/../hosts"
+  content  = <<-EOT
+    192.168.56.10 keycloak.local gitea.local todo.local
+  EOT
+}
 
 # Bring up cloud-gauntlet VM using Vagrant
 resource "null_resource" "vagrant_up" {
@@ -48,14 +104,38 @@ resource "null_resource" "vagrant_up" {
 
 # Fetch kubeconfig from the cloud-gauntlet VM and rewrite the API server address to VM IP
 resource "null_resource" "fetch_kubeconfig" {
-  depends_on = [null_resource.provision_infrastructure]
+  depends_on = [null_resource.vagrant_up]
 
+  # This will be triggered when the VM IP changes
   triggers = {
-    master_ip  = var.k3s_master_ip
+    master_ip = var.k3s_master_ip
   }
 
+  # Copy kubeconfig from VM to local machine
   provisioner "local-exec" {
-    command = "bash -lc 'vagrant ssh cloud-gauntlet -c \"sudo cat /etc/rancher/k3s/k3s.yaml\" > \"${path.module}/kubeconfig.raw\" && sed -E \"/^Warning:|^Install it with:/d;s#server: https?://127.0.0.1:6443#server: https://${var.k3s_master_ip}:6443#g\" \"${path.module}/kubeconfig.raw\" > \"${path.module}/kubeconfig\" && rm -f \"${path.module}/kubeconfig.raw\"'"
+    command = <<-EOT
+      bash -lc '
+        cd ${path.module}/..
+        # Get VM SSH config
+        vagrant ssh-config cloud-gauntlet > /tmp/vagrant-ssh-config
+        # Copy kubeconfig from VM
+        scp -F /tmp/vagrant-ssh-config cloud-gauntlet:/etc/rancher/k3s/k3s.yaml ${path.module}/kubeconfig
+        # Update kubeconfig to use VM IP instead of 127.0.0.1
+        sed -i "s/127.0.0.1/"${var.k3s_master_ip}"/g" ${path.module}/kubeconfig
+        # Set proper permissions
+        chmod 600 ${path.module}/kubeconfig
+        
+        # Copy kubeconfig to default location for kubectl
+        mkdir -p ~/.kube
+        cp ${path.module}/kubeconfig ~/.kube/config
+      '
+    EOT
+  }
+
+  # Clean up local kubeconfig when destroying
+  provisioner "local-exec" {
+    when    = destroy
+    command = "rm -f ${path.module}/kubeconfig ~/.kube/config"
   }
 }
 
@@ -130,18 +210,49 @@ locals {
 # Apply workloads via a child Terraform run after kubeconfig is fetched
 resource "null_resource" "workloads_apply" {
   depends_on = [
-    null_resource.k8s_node_prep,
-    null_resource.fetch_kubeconfig,
-    null_resource.preload_images
+    null_resource.setup_kubeconfig,
+    null_resource.k8s_verify_nodes,
+    local_file.ansible_inventory,
+    local_file.ansible_vars,
+    local_file.hosts_file
   ]
 
-  triggers = {
-    # Reconcile Helm releases on every apply (idempotent)
-    always_run = timestamp()
+  # This will run after the VM is fully provisioned
+  provisioner "local-exec" {
+    command = <<-EOT
+      set -e
+      echo "Applying workloads..."
+      
+      # Ensure we're in the correct directory
+      cd ${path.module}/workloads
+      
+      # Copy the kubeconfig to the workloads directory
+      echo "Copying kubeconfig to workloads directory..."
+      mkdir -p ./.kube
+      cp ../.kube/config ./.kube/config
+      chmod 600 ./.kube/config
+      
+      # Initialize Terraform
+      echo "Initializing Terraform..."
+      if ! terraform init -upgrade -input=false; then
+        echo "Terraform initialization failed"
+        exit 1
+      fi
+      
+      # Apply the Terraform configuration
+      echo "Applying Terraform configuration..."
+      if ! terraform apply -auto-approve; then
+        echo "Terraform apply failed"
+        exit 1
+      fi
+      
+      echo "Workloads applied successfully"
+    EOT
   }
 
-  provisioner "local-exec" {
-    command = "bash -lc 'KCFG=\"$(readlink -f ${path.module}/kubeconfig)\" && terraform -chdir=./workloads init -upgrade -input=false && terraform -chdir=./workloads apply -var kubeconfig_path=\"$KCFG\" -auto-approve'"
+  # This ensures the resource is always recreated to apply any changes
+  triggers = {
+    always_run = "${timestamp()}"
   }
 }
 

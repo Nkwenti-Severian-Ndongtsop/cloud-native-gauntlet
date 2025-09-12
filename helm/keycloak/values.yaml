@@ -1,59 +1,160 @@
-namespace: keycloak
+# Default values for keycloak.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
 
-# Whether this chart should create the namespace
-createNamespace: false
+# Keycloak configuration
+keycloak:
+  image:
+    repository: localhost:5000/jboss/keycloak
+    tag: latest
+    pullPolicy: IfNotPresent
 
-# Database configuration
-database:
-  type: cnpg  # Options: cnpg, postgres
-  cnpg:
-    enabled: true
-  postgres:
-    enabled: false
+  # Database configuration
+  db:
+    vendor: postgres
+    host: keycloak-db-rw.keycloak.svc.cluster.local
+    port: 5432
+    name: keycloak
+    username: postgres
+    existingSecret: keycloak-db-credentials
+    existingSecretPasswordKey: password
 
-secrets:
-  postgres:
-    name: postgres-credentials
-    admin:
-      name: nkwenti
-      password: password
-  tls:
-    name: tls-secret
-    cert: ""
-    key: ""
-  keycloak:
-    name: keycloak-secrets
-    # Set to true only on first install; then set to false to avoid duplicate admin creation
-    bootstrap: false
-    admin:
-      name: nkwenti
-      password: password
+  # Service configuration
+  service:
+    type: ClusterIP
+    httpPort: 8080
+    httpsPort: 8443
 
-deployments:
-  securePort: 80
-  postgres:
-    image:
-      name: 192.168.56.10:5000/cloudnative-pg/postgresql:14
-    db:
-      name: keycloak
-    service:
-      name: postgres
-      port: 5432
-    volume:
-      name: postgres-storage
-      path: /var/lib/postgresql/data
-  keycloak:
-    service:
-      name: keycloak
-    ports:
-      containerPort: 9000
-    image: "192.168.56.10:5000/keycloak/keycloak:26.3.3"
+  # Admin user configuration
+  auth:
+    adminUser: admin
+    adminPassword: admin
+    managementUser: manager
+    managementPassword: manager
+
+  # Resource requests and limits
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  # Ingress configuration
   ingress:
-    host: keycloak.local
+    enabled: true
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    hosts:
+      - host: keycloak.local
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
 
-pv:
-  name: postgres-pv
-  size: 512Mi
-pvc:
-  name: postgres-pvc
-  size: 512Mi
+# CNPG (CloudNativePG) configuration
+cnpg:
+  enabled: true
+  # This will create a Cluster resource that defines the PostgreSQL cluster
+  cluster:
+    enabled: true
+    name: keycloak-db
+    namespace: keycloak
+    instances: 1  # Single instance for development, set to 3 for production HA
+    
+    # Persistent storage configuration with proper reclaim policy
+    storage:
+      size: 512Mi
+      storageClass: ""  # Use default storage class
+      persistentVolume:
+        enabled: true
+        size: 512Mi
+        storageClass: ""
+        persistentVolumeReclaimPolicy: Retain
+    
+    # WAL (Write-Ahead Log) configuration for data durability
+    walStorage:
+      size: 512Mi
+      persistentVolume:
+        enabled: true
+        size: 512Mi
+        storageClass: ""
+        persistentVolumeReclaimPolicy: Retain
+    
+    # Resource requests and limits
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+    # PostgreSQL configuration for durability
+    postgresql:
+      parameters:
+        max_connections: "100"
+        shared_buffers: "128MB"
+        work_mem: "4MB"
+        maintenance_work_mem: "64MB"
+        wal_level: "replica"
+        max_wal_size: "1GB"
+        min_wal_size: "80MB"
+        checkpoint_timeout: "15min"
+        archive_mode: "on"
+        archive_timeout: "300"
+        max_wal_senders: "5"
+        wal_keep_size: "512MB"
+        hot_standby: "on"
+        hot_standby_feedback: "on"
+    
+    # Local backup configuration using node filesystem
+    backup:
+      barmanObjectStore:
+        destinationPath: "/var/lib/postgresql/backups"
+        endpointURL: ""
+      volume:
+        enabled: true
+        name: backup-volume
+        size: 1Gi  # Slightly larger than data volume for backup storage
+        storageClass: ""
+        persistentVolume:
+          enabled: true
+          size: 1Gi
+          storageClass: ""
+          persistentVolumeReclaimPolicy: Retain
+      retentionPolicy: "30d"  # Keep backups for 30 days
+    
+    # Monitoring and observability
+    monitor:
+      enablePodMonitor: true
+    
+    # High availability settings
+    primaryUpdateStrategy: "unsupervised"
+    
+    # Bootstrap configuration with proper credentials
+    bootstrap:
+      initdb:
+        database: keycloak
+        owner: postgres
+        secret:
+          name: keycloak-db-credentials
+    
+    # Pod anti-affinity to ensure pods are spread across nodes
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - keycloak-db
+            topologyKey: "kubernetes.io/hostname"
+    
+    # Pod disruption budget for HA
+    podDisruptionBudget:
+      maxUnavailable: 1
+      minAvailable: 1
