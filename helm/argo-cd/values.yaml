@@ -57,7 +57,7 @@ global:
   # Default image used by all components
   image:
     # -- If defined, a repository applied to all Argo CD deployments
-    repository: quay.io/argoproj/argocd
+    repository: 192.168.56.10:5000/argoproj/argocd
     # -- Overrides the global Argo CD image tag whose default is the chart appVersion
     tag: ""
     # -- If defined, a imagePullPolicy applied to all Argo CD deployments
@@ -1165,9 +1165,9 @@ dex:
   ## Dex image
   image:
     # -- Dex image repository
-    repository: ghcr.io/dexidp/dex
+    repository: 192.168.56.10:5000/dexidp/dex
     # -- Dex image tag
-    tag: v2.44.0
+    tag: v2.43.0
     # -- Dex imagePullPolicy
     # @default -- `""` (defaults to global.image.imagePullPolicy)
     imagePullPolicy: ""
@@ -1439,10 +1439,10 @@ redis:
   ## Redis image
   image:
     # -- Redis repository
-    repository: ecr-public.aws.com/docker/library/redis
+    repository: 192.168.56.10:5000/library/redis
     # -- Redis tag
     ## Do not upgrade to >= 7.4.0, otherwise you are no longer using an open source version of Redis
-    tag: 7.2.8-alpine
+    tag: 7.2.7-alpine
     # -- Redis image pull policy
     # @default -- `""` (defaults to global.image.imagePullPolicy)
     imagePullPolicy: ""
@@ -1456,7 +1456,7 @@ redis:
     ## Prometheus redis-exporter image
     image:
       # -- Repository to use for the redis-exporter
-      repository: ghcr.io/oliver006/redis_exporter
+      repository: 192.168.56.10:5000/oliver006/redis_exporter
       # -- Tag to use for the redis-exporter
       tag: v1.77.0
       # -- Image pull policy for the redis-exporter
@@ -1735,10 +1735,10 @@ redis-ha:
   ## Redis image
   image:
     # -- Redis repository
-    repository: ecr-public.aws.com/docker/library/redis
+    repository: 192.168.56.10:5000/library/redis
     # -- Redis tag
     ## Do not upgrade to >= 7.4.0, otherwise you are no longer using an open source version of Redis
-    tag: 7.2.8-alpine
+    tag: 7.2.7-alpine
   ## Prometheus redis-exporter sidecar
   exporter:
     # -- Enable Prometheus redis-exporter sidecar
@@ -1769,7 +1769,7 @@ redis-ha:
       app.kubernetes.io/name: argocd-redis-ha-haproxy
     image:
       # -- HAProxy Image Repository
-      repository: ecr-public.aws.com/docker/library/haproxy
+      repository: 192.168.56.10:5000/library/haproxy
     metrics:
       # -- HAProxy enable prometheus metric scraping
       enabled: true
@@ -2022,7 +2022,7 @@ server:
     ## Argo CD extension installer image
     image:
       # -- Repository to use for extension installer image
-      repository: "quay.io/argoprojlabs/argocd-extension-installer"
+      repository: "192.168.56.10:5000/argoprojlabs/argocd-extension-installer"
       # -- Tag to use for extension installer image
       tag: "v0.0.8"
       # -- Image pull policy for extensions

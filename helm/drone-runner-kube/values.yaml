@@ -1,5 +1,5 @@
 image:
-  repository: drone/drone-runner-kube
+  repository: 192.168.56.10:5000/drone/drone-runner-kube
   tag: 1.0.0-rc.3
   pullPolicy: IfNotPresent
 

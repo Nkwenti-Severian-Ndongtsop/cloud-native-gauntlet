@@ -12,7 +12,7 @@ global:
 ##
 image:
   # -- Redis image repository
-  repository: public.ecr.aws/docker/library/redis
+  repository: 192.168.56.10:5000/library/redis
   # -- Redis image tag
   tag: 7.2.7-alpine
   # -- Redis image pull policy
@@ -68,7 +68,7 @@ configmapTest:
   # -- Image for redis-ha-configmap-test hook
   image:
     # -- Repository of the configmap shellcheck test image.
-    repository: koalaman/shellcheck
+    repository: 192.168.56.10:5000/koalaman/shellcheck
     # -- Tag of the configmap shellcheck test image.
     tag: v0.10.0
   # -- Resources for the ConfigMap test pod
@@ -125,9 +125,9 @@ haproxy:
     #   maxUnavailable: 25%
   image:
     # -- HAProxy Image Repository
-    repository: public.ecr.aws/docker/library/haproxy
+    repository: 192.168.56.10:5000/library/haproxy
     # -- HAProxy Image Tag
-    tag: 3.0.8-alpine
+    tag: 2.8-alpine
     # -- HAProxy Image PullPolicy
     pullPolicy: IfNotPresent
 
@@ -333,9 +333,9 @@ sysctlImage:
   # -- sysctlImage Init container registry
   registry: public.ecr.aws/docker/library
   # -- sysctlImage Init container name
-  repository: busybox
+  repository: 192.168.56.10:5000/library/busybox
   # -- sysctlImage Init container tag
-  tag: 1.34.1
+  tag: 1.36
   # -- sysctlImage Init container pull policy
   pullPolicy: Always
   # -- Mount the host `/sys` folder to `/host-sys`

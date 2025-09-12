@@ -1,79 +1,24 @@
 {{- if .Values.cnpg.enabled }}
-Keycloak has been deployed with CloudNativePG as the database backend.
+Keycloak has been deployed with a CloudNativePG managed PostgreSQL database.
 
-1. Get the Keycloak URL by running these commands:
-{{- if .Values.keycloak.ingress.enabled }}
-{{- range .Values.keycloak.ingress.hosts }}
-  {{- range .paths }}
-  http{{ if $.Values.keycloak.ingress.tls }}s{{ end }}://{{ .host }}{{ .path }}
-  {{- end }}
-{{- end }}
-{{- else if contains "NodePort" .Values.keycloak.service.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "keycloak.fullname" . }})
-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo "Keycloak URL: http://$NODE_IP:$NODE_PORT"
-{{- else if contains "LoadBalancer" .Values.keycloak.service.type }}
-     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch the status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "keycloak.fullname" . }}'
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "keycloak.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-  echo "Keycloak URL: http://$SERVICE_IP:{{ .Values.keycloak.service.port }}"
-{{- else if contains "ClusterIP" .Values.keycloak.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "keycloak.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
-  echo "Keycloak is running in ClusterIP mode. Use port-forwarding to access it:"
-  echo "kubectl port-forward $POD_NAME 8080:8080 --namespace {{ .Release.Namespace }}"
-  echo "Then open http://localhost:8080 in your browser"
-{{- end }}
-
-2. Get the admin credentials:
-   Username: {{ .Values.keycloak.auth.adminUser }}
-   Password: {{ .Values.keycloak.auth.adminPassword }}
-
-3. Get the management console credentials:
-   Username: {{ .Values.keycloak.auth.managementUser }}
-   Password: {{ .Values.keycloak.auth.managementPassword }}
-
-4. PostgreSQL Database Information:
-   - Database Name: {{ .Values.keycloak.db.name }}
-   - Username: {{ .Values.keycloak.db.username }}
-   - Password: Retrieved from secret/{{ .Values.keycloak.db.existingSecret }}
-   - Host: {{ .Values.keycloak.db.host }}
-   - Port: {{ .Values.keycloak.db.port }}
-
-5. To monitor the PostgreSQL cluster:
-   kubectl get postgresql -n {{ .Release.Namespace }} {{ .Values.cnpg.cluster.name }}
-   kubectl get pods -n {{ .Release.Namespace }} -l cnpg.io/cluster={{ .Values.cnpg.cluster.name }}
-
+Database Configuration:
+  Host: {{ .Values.keycloak.db.host }}
+  Port: {{ .Values.keycloak.db.port }}
+  Database: {{ .Values.keycloak.db.name }}
+  Username: {{ .Values.keycloak.db.username }}
+  Password: Stored in secret/{{ .Values.keycloak.db.existingSecret }}
 {{- else }}
-Keycloak has been deployed with the default H2 database (not recommended for production).
-
-1. Get the Keycloak URL by running these commands:
-{{- if .Values.keycloak.ingress.enabled }}
-{{- range .Values.keycloak.ingress.hosts }}
-  {{- range .paths }}
-  http{{ if $.Values.keycloak.ingress.tls }}s{{ end }}://{{ .host }}{{ .path }}
-  {{- end }}
-{{- end }}
-{{- else if contains "NodePort" .Values.keycloak.service.type }}
-  export NODE_PORT=$(kubectl get --namespace {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "keycloak.fullname" . }})
-  export NODE_IP=$(kubectl get nodes --namespace {{ .Release.Namespace }} -o jsonpath="{.items[0].status.addresses[0].address}")
-  echo "Keycloak URL: http://$NODE_IP:$NODE_PORT"
-{{- else if contains "LoadBalancer" .Values.keycloak.service.type }}
-     NOTE: It may take a few minutes for the LoadBalancer IP to be available.
-           You can watch the status by running 'kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "keycloak.fullname" . }}'
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "keycloak.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-  echo "Keycloak URL: http://$SERVICE_IP:{{ .Values.keycloak.service.port }}"
-{{- else if contains "ClusterIP" .Values.keycloak.service.type }}
-  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "keycloak.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
-  echo "Keycloak is running in ClusterIP mode. Use port-forwarding to access it:"
-  echo "kubectl port-forward $POD_NAME 8080:8080 --namespace {{ .Release.Namespace }}"
-  echo "Then open http://localhost:8080 in your browser"
+Keycloak has been deployed with an external database.
 {{- end }}
 
-2. Get the admin credentials:
-   Username: {{ .Values.keycloak.auth.adminUser }}
-   Password: {{ .Values.keycloak.auth.adminPassword }}
+Admin Credentials:
+  Username: {{ .Values.keycloak.auth.adminUser }}
+  Password: Stored in secret/{{ .Release.Name }}-admin-credentials
 
-3. Get the management console credentials:
-   Username: {{ .Values.keycloak.auth.managementUser }}
-   Password: {{ .Values.keycloak.auth.managementPassword }}
-{{- end }}
+Access Keycloak UI at: {{ .Values.keycloak.ingress.hostname }}
+
+To get the admin password:
+  kubectl get secret {{ .Release.Name }}-admin-credentials -n {{ .Release.Namespace }} -o jsonpath="{.data.password}" | base64 --decode
+
+To access Keycloak:
+  kubectl port-forward svc/{{ .Release.Name }} -n {{ .Release.Namespace }} 8080:80

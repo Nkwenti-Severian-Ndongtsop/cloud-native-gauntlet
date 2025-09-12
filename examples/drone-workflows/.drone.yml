@@ -1,0 +1,161 @@
+---
+# Drone CI/CD Pipeline for Todo App
+kind: pipeline
+type: kubernetes
+name: todo-app-pipeline
+
+# Global settings
+metadata:
+  namespace: drone-builds
+
+# Build steps
+steps:
+  # Step 1: Build Rust application
+  - name: build-rust-app
+    image: 192.168.56.10:5000/rust:1.70
+    commands:
+      - echo "Building Rust Todo application..."
+      - cd todo_app
+      - cargo build --release
+      - echo "✅ Rust build completed"
+    volumes:
+      - name: cargo-cache
+        path: /usr/local/cargo/registry
+
+  # Step 2: Run tests
+  - name: test-rust-app
+    image: 192.168.56.10:5000/rust:1.70
+    commands:
+      - echo "Running Rust tests..."
+      - cd todo_app
+      - cargo test
+      - echo "✅ Tests completed"
+    volumes:
+      - name: cargo-cache
+        path: /usr/local/cargo/registry
+    depends_on:
+      - build-rust-app
+
+  # Step 3: Build Docker image
+  - name: build-docker-image
+    image: 192.168.56.10:5000/docker:dind
+    privileged: true
+    commands:
+      - echo "Building Docker image..."
+      - cd todo_app
+      - docker build -t 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api:${DRONE_COMMIT_SHA:0:8} .
+      - docker build -t 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api:latest .
+      - echo "✅ Docker image built"
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    depends_on:
+      - test-rust-app
+
+  # Step 4: Push Docker image to registry
+  - name: push-docker-image
+    image: 192.168.56.10:5000/docker:dind
+    commands:
+      - echo "Pushing Docker image to registry..."
+      - docker push 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api:${DRONE_COMMIT_SHA:0:8}
+      - docker push 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api:latest
+      - echo "✅ Docker image pushed"
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    depends_on:
+      - build-docker-image
+
+  # Step 5: Update Helm chart (GitOps)
+  - name: update-helm-chart
+    image: 192.168.56.10:5000/alpine/git:latest
+    commands:
+      - echo "Updating Helm chart with new image tag..."
+      - apk add --no-cache yq
+      - cd helm/todo-app
+      - yq eval '.todoApp.image.tag = "${DRONE_COMMIT_SHA:0:8}"' -i values.yaml
+      - git config --global user.email "drone@drone.local"
+      - git config --global user.name "Drone CI"
+      - git add values.yaml
+      - git commit -m "Update Todo app image to ${DRONE_COMMIT_SHA:0:8}" || echo "No changes to commit"
+      - echo "✅ Helm chart updated"
+    depends_on:
+      - push-docker-image
+    when:
+      branch:
+        - main
+        - master
+
+  # Step 6: Deploy to staging (optional)
+  - name: deploy-staging
+    image: 192.168.56.10:5000/alpine/helm:latest
+    commands:
+      - echo "Deploying to staging environment..."
+      - helm upgrade --install todo-app-staging ./helm/todo-app \
+          --namespace todo-staging \
+          --create-namespace \
+          --set todoApp.image.tag=${DRONE_COMMIT_SHA:0:8} \
+          --set todoApp.ingress.hosts[0].host=todo-staging.local
+      - echo "✅ Deployed to staging"
+    depends_on:
+      - update-helm-chart
+    when:
+      branch:
+        - develop
+        - staging
+
+  # Step 7: Notify on completion
+  - name: notify-completion
+    image: 192.168.56.10:5000/curlimages/curl:latest
+    commands:
+      - echo "Pipeline completed successfully! 🎉"
+      - echo "Image: 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api:${DRONE_COMMIT_SHA:0:8}"
+      - echo "Branch: ${DRONE_BRANCH}"
+      - echo "Commit: ${DRONE_COMMIT_SHA}"
+    depends_on:
+      - push-docker-image
+    when:
+      status:
+        - success
+
+# Volumes for caching and Docker socket
+volumes:
+  - name: cargo-cache
+    temp: {}
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+
+# Triggers
+trigger:
+  branch:
+    - main
+    - master
+    - develop
+    - staging
+  event:
+    - push
+    - pull_request
+
+---
+# Notification pipeline (runs after main pipeline)
+kind: pipeline
+type: kubernetes
+name: notify-pipeline
+
+steps:
+  - name: notify-success
+    image: 192.168.56.10:5000/curlimages/curl:latest
+    commands:
+      - echo "🎉 Todo App Pipeline Completed Successfully!"
+      - echo "✅ Build: PASSED"
+      - echo "✅ Tests: PASSED" 
+      - echo "✅ Docker: PUSHED"
+      - echo "🚀 Ready for deployment!"
+
+depends_on:
+  - todo-app-pipeline
+
+trigger:
+  status:
+    - success

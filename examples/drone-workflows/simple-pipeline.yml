@@ -1,0 +1,99 @@
+---
+# Simple Drone CI/CD Pipeline Example
+kind: pipeline
+type: kubernetes
+name: simple-build
+
+metadata:
+  namespace: drone-builds
+
+steps:
+  # Step 1: Clone and prepare
+  - name: prepare
+    image: 192.168.56.10:5000/alpine:latest
+    commands:
+      - echo "🚀 Starting CI/CD pipeline..."
+      - echo "Repository: ${DRONE_REPO}"
+      - echo "Branch: ${DRONE_BRANCH}"
+      - echo "Commit: ${DRONE_COMMIT_SHA:0:8}"
+      - ls -la
+
+  # Step 2: Build (customize based on your project)
+  - name: build
+    image: 192.168.56.10:5000/alpine:latest
+    commands:
+      - echo "🔨 Building application..."
+      - echo "Add your build commands here"
+      - echo "Examples:"
+      - echo "  - npm install && npm run build"
+      - echo "  - cargo build --release"
+      - echo "  - go build -o app"
+      - echo "  - mvn clean package"
+      - echo "✅ Build completed"
+
+  # Step 3: Test (customize based on your project)
+  - name: test
+    image: 192.168.56.10:5000/alpine:latest
+    commands:
+      - echo "🧪 Running tests..."
+      - echo "Add your test commands here"
+      - echo "Examples:"
+      - echo "  - npm test"
+      - echo "  - cargo test"
+      - echo "  - go test ./..."
+      - echo "  - mvn test"
+      - echo "✅ Tests completed"
+    depends_on:
+      - build
+
+  # Step 4: Package (optional)
+  - name: package
+    image: 192.168.56.10:5000/docker:dind
+    privileged: true
+    commands:
+      - echo "📦 Packaging application..."
+      - echo "Add your packaging commands here"
+      - echo "Examples:"
+      - echo "  - docker build -t myapp:latest ."
+      - echo "  - docker push registry/myapp:latest"
+      - echo "✅ Packaging completed"
+    volumes:
+      - name: docker-sock
+        path: /var/run/docker.sock
+    depends_on:
+      - test
+    when:
+      branch:
+        - main
+        - master
+
+  # Step 5: Deploy (optional)
+  - name: deploy
+    image: 192.168.56.10:5000/alpine/helm:latest
+    commands:
+      - echo "🚀 Deploying application..."
+      - echo "Add your deployment commands here"
+      - echo "Examples:"
+      - echo "  - helm upgrade --install myapp ./charts/myapp"
+      - echo "  - kubectl apply -f k8s/"
+      - echo "✅ Deployment completed"
+    depends_on:
+      - package
+    when:
+      branch:
+        - main
+        - master
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  branch:
+    - main
+    - master
+    - develop
+  event:
+    - push
+    - pull_request

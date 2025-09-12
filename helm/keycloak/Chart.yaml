@@ -1,15 +1,14 @@
 apiVersion: v2
 name: keycloak
-description: A Helm chart for deploying Keycloak with CloudNativePG
+description: A Helm chart for Keycloak with CNPG integration
 type: application
-version: 0.1.0
-appVersion: "22.0.0"
-dependencies:
-  - name: postgresql
-    version: "12.x.x"
-    repository: "https://charts.bitnami.com/bitnami"
-    condition: postgresql.enabled
-  - name: cnpg
-    version: "0.19.1"
-    repository: "https://cloudnative-pg.github.io/charts"
-    condition: cnpg.enabled
+version: 1.0.14
+appVersion: 26.3.3
+keywords:
+  - keycloak
+  - identity
+  - authentication
+  - authorization
+maintainers:
+  - name: Your Name
+    email: your.email@example.com

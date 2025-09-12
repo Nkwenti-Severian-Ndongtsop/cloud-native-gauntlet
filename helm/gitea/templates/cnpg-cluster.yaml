@@ -12,7 +12,7 @@ metadata:
     "helm.sh/hook-weight": "-5"
 spec:
   instances: 1
-  imageName: localhost:5000/cloudnative-pg/postgresql:14
+  imageName: 192.168.56.10:5000/cloudnative-pg/postgresql:14
   enableSuperuserAccess: true
   
   bootstrap:

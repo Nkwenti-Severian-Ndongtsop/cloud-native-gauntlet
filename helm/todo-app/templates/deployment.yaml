@@ -39,7 +39,7 @@ spec:
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.todoApp.database.existingSecret }}
+                  name: todo-db-superuser
                   key: password
           resources:
             {{- toYaml .Values.todoApp.resources | nindent 12 }}

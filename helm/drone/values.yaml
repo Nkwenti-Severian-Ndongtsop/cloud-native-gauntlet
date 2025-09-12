@@ -6,9 +6,9 @@ hostAliases: []
   #   - gitea-127.0.0.1.sslip.io
 
 image:
-  registry: docker.io
+  registry: 192.168.56.10:5000
   repository: drone/drone
-  tag: 2.12.1
+  tag: 2.24.0
   pullPolicy: IfNotPresent
 
 ## If you need to pull images from a private Docker image repository, pass in the name

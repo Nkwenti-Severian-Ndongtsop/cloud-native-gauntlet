@@ -17,6 +17,15 @@ IMAGES=(
   "quay.io/argoproj/argocd:v3.1.5"
   "ghcr.io/dexidp/dex:v2.43.0"
   "public.ecr.aws/docker/library/redis:7.2.7-alpine"
+  "ghcr.io/oliver006/redis_exporter:v1.77.0"
+  "quay.io/argoprojlabs/argocd-extension-installer:v0.0.8"
+  "public.ecr.aws/docker/library/haproxy:2.8-alpine"
+  "koalaman/shellcheck:v0.10.0"
+  "busybox:1.36"
+
+  # Drone CI/CD stack
+  "drone/drone:2.24.0"
+  "drone/drone-runner-kube:1.0.0-rc.3"
 
   # todo-api
   "ghcr.io/nkwenti-severian-ndongtsop/todo-api:latest"
@@ -67,6 +76,4 @@ for image in "${IMAGES[@]}"; do
   fi
 done
 
-echo "\nAll images have been saved to the offline-images directory."
-echo "To load these images on another machine, run:"
-echo "  for img in offline-images/*.tar; do docker load -i \$img; done"
+echo "\nAll images have been saved to the registry."

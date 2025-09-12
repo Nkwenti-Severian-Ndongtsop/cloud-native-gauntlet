@@ -1,7 +1,7 @@
 # Todo App Configuration
 todoApp:
   image:
-    repository: 192.168.56.10:5000/todo-app
+    repository: 192.168.56.10:5000/nkwenti-severian-ndongtsop/todo-api
     tag: "latest"
     pullPolicy: IfNotPresent
   
@@ -36,18 +36,20 @@ todoApp:
     port: 5432
     name: todo
     user: postgres
-    existingSecret: todo-db-credentials
+    existingSecret: todo-db-superuser
   
   # Environment variables
   env:
     - name: DATABASE_URL
       value: "postgresql://postgres:$(DB_PASSWORD)@todo-db-rw.todo.svc.cluster.local:5432/todo"
-    - name: RUST_LOG
-      value: "info"
-    - name: SERVER_HOST
-      value: "0.0.0.0"
-    - name: SERVER_PORT
-      value: "8080"
+    - name: KEYCLOAK_URL
+      value: "http://keycloak.local"
+    - name: KEYCLOAK_REALM
+      value: "todo-app"
+    - name: KEYCLOAK_CLIENT_ID
+      value: "todo-app"
+    - name: KEYCLOAK_CLIENT_SECRET
+      value: "AR10DzMjGrWK8lzE8xSdzxEWe84HxRFh"
 
 # PostgreSQL CNPG Configuration
 postgresql:
